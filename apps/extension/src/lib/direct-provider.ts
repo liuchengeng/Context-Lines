@@ -314,6 +314,7 @@ type HandshakeDiagnostic = {
   apiStatus?: string;
   apiMessage?: string;
   logId?: string;
+  networkError?: string;
   authHeadersSeen: boolean;
 };
 
@@ -323,10 +324,14 @@ function observeDoubaoHandshake(): {
 } {
   const diagnostic: HandshakeDiagnostic = { authHeadersSeen: false };
   const webRequest = chrome.webRequest;
-  if (!webRequest?.onBeforeSendHeaders || !webRequest.onHeadersReceived) {
+  if (
+    !webRequest?.onSendHeaders ||
+    !webRequest.onHeadersReceived ||
+    !webRequest.onErrorOccurred
+  ) {
     return { diagnostic, cleanup: () => undefined };
   }
-  const before = (details: chrome.webRequest.OnBeforeSendHeadersDetails) => {
+  const sent = (details: chrome.webRequest.OnSendHeadersDetails) => {
     const names = new Set(
       (details.requestHeaders ?? []).map((header) => header.name.toLowerCase()),
     );
@@ -335,7 +340,6 @@ function observeDoubaoHandshake(): {
       names.has("x-api-access-key") &&
       names.has("x-api-resource-id") &&
       names.has("x-api-connect-id");
-    return undefined;
   };
   const received = (details: chrome.webRequest.OnHeadersReceivedDetails) => {
     diagnostic.statusCode = details.statusCode;
@@ -353,7 +357,10 @@ function observeDoubaoHandshake(): {
     if (logId) diagnostic.logId = logId;
     return undefined;
   };
-  webRequest.onBeforeSendHeaders.addListener(before, DOUBAO_URL_FILTER, [
+  const failed = (details: chrome.webRequest.OnErrorOccurredDetails) => {
+    diagnostic.networkError = details.error;
+  };
+  webRequest.onSendHeaders.addListener(sent, DOUBAO_URL_FILTER, [
     "requestHeaders",
     "extraHeaders",
   ]);
@@ -361,11 +368,13 @@ function observeDoubaoHandshake(): {
     "responseHeaders",
     "extraHeaders",
   ]);
+  webRequest.onErrorOccurred.addListener(failed, DOUBAO_URL_FILTER);
   return {
     diagnostic,
     cleanup: () => {
-      webRequest.onBeforeSendHeaders.removeListener(before);
+      webRequest.onSendHeaders.removeListener(sent);
       webRequest.onHeadersReceived.removeListener(received);
+      webRequest.onErrorOccurred.removeListener(failed);
     },
   };
 }
@@ -375,7 +384,9 @@ function formatHandshakeError(diagnostic: HandshakeDiagnostic): string {
   if (diagnostic.statusCode) parts.push(`HTTP ${diagnostic.statusCode}`);
   if (diagnostic.apiStatus) parts.push(`状态 ${diagnostic.apiStatus}`);
   if (diagnostic.apiMessage) parts.push(diagnostic.apiMessage);
-  if (!diagnostic.authHeadersSeen) parts.push("Chrome 未注入鉴权请求头");
+  if (!diagnostic.authHeadersSeen) parts.push("Chrome 最终请求中没有鉴权头");
+  if (diagnostic.networkError)
+    parts.push(`网络错误 ${diagnostic.networkError}`);
   if (diagnostic.logId) parts.push(`LogID ${diagnostic.logId}`);
   return `${parts.join("；")}。`;
 }
