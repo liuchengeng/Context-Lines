@@ -84,6 +84,7 @@ describe("relay worker", () => {
 
   it("validates DeepSeek output before returning it", async () => {
     const modelAnswer = {
+      translation_zh: "想都别想。",
       explanations: [{ phrase: "Not a chance", meaning_zh: "想都别想" }],
     };
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -112,6 +113,7 @@ describe("relay worker", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       transcript: "Not a chance.",
+      translation_zh: modelAnswer.translation_zh,
       explanations: modelAnswer.explanations,
     });
   });

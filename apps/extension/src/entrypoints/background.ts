@@ -213,6 +213,7 @@ async function updateOverlay(
         .paused { margin: 0 0 9px; color: #e2bd72; font-size: 11px; }
         p { margin: 0; color: #d5d6d8; }
         .sentence { color: #f3f4f6; font-size: 17px; font-weight: 600; line-height: 1.5; }
+        .translation { color: #d8dee8; font-size: 14px; line-height: 1.5; }
         .highlight { padding: 1px 2px; border-radius: 3px; font-weight: 760; }
         .tone-0 { color: #9bc1ff; }
         .tone-1 { color: #d7adff; }
@@ -316,6 +317,9 @@ async function updateOverlay(
           nextView.answer.explanations,
         );
         card.append(sentence);
+
+        addText("p", "整句中文", "label");
+        addText("p", nextView.answer.translation_zh, "translation");
 
         addText("p", "选出的表达", "label");
         const explanations = document.createElement("div");

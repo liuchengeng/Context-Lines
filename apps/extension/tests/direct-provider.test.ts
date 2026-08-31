@@ -134,6 +134,7 @@ describe("relay provider", () => {
 
     const answer = {
       transcript: "Not a chance.",
+      translation_zh: "想都别想。",
       explanations: [{ phrase: "Not a chance", meaning_zh: "想都别想" }],
     };
     const fetchMock = vi.fn().mockResolvedValue(

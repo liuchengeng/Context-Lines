@@ -22,6 +22,7 @@ describe("quick ask contracts", () => {
     expect(
       QuickAskAnswerSchema.safeParse({
         transcript: "Not a chance.",
+        translation_zh: "想都别想。",
         explanations: [
           { phrase: "Not a chance", meaning_zh: "想都别想" },
           { phrase: "a chance", meaning_zh: "机会" },
@@ -31,6 +32,7 @@ describe("quick ask contracts", () => {
     expect(
       QuickAskAnswerSchema.safeParse({
         transcript: "Not a chance.",
+        translation_zh: "想都别想。",
         explanations: [],
       }).success,
     ).toBe(false);
