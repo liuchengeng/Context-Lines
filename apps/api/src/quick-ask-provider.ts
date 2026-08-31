@@ -21,6 +21,10 @@ const UpstreamMessageSchema = z.object({
     .min(1),
 });
 
+const DoubaoAsrResponseSchema = z.object({
+  result: z.object({ text: z.string() }),
+});
+
 function required(value: string | undefined, label: string): string {
   const normalized = value?.trim();
   if (!normalized)
@@ -83,45 +87,95 @@ function messageText(payload: unknown): string {
   );
 }
 
-export async function answerQuickAsk(
+async function transcribeWithDoubao(
   env: Env,
   input: QuickAskRequest,
-): Promise<QuickAskAnswer> {
-  const qwenBaseUrl = required(env.QWEN_ASR_BASE_URL, "Qwen ASR 地址").replace(
-    /\/$/,
-    "",
-  );
-  const qwenModel = required(env.QWEN_ASR_MODEL, "Qwen ASR 模型");
-  const qwenPayload = await upstreamJson(
-    `${qwenBaseUrl}/chat/completions`,
-    required(env.DASHSCOPE_API_KEY, "DashScope API Key"),
-    {
-      model: qwenModel,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_audio",
-              input_audio: {
-                data: `data:${input.mime_type};base64,${input.audio_base64}`,
-              },
-            },
-          ],
-        },
-      ],
-      stream: false,
-      asr_options: { enable_itn: true },
+): Promise<string> {
+  const endpoint = required(env.DOUBAO_ASR_URL, "豆包极速识别地址");
+  const resourceId = required(env.DOUBAO_ASR_RESOURCE_ID, "豆包资源 ID");
+  const model = required(env.DOUBAO_ASR_MODEL, "豆包 ASR 模型");
+  const apiKey = env.DOUBAO_API_KEY?.trim();
+  const appKey = env.DOUBAO_APP_KEY?.trim();
+  const accessKey = env.DOUBAO_ACCESS_KEY?.trim();
+  if (!apiKey && !(appKey && accessKey)) {
+    throw new HttpError(
+      500,
+      "SERVER_MISCONFIGURED",
+      "豆包语音凭证尚未配置。",
+      false,
+    );
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Api-Resource-Id": resourceId,
+      "X-Api-Request-Id": crypto.randomUUID(),
+      "X-Api-Sequence": "-1",
+      ...(apiKey
+        ? { "X-Api-Key": apiKey }
+        : {
+            "X-Api-App-Key": appKey!,
+            "X-Api-Access-Key": accessKey!,
+          }),
     },
-  );
-  const transcript = messageText(qwenPayload);
-  if (!transcript)
+    body: JSON.stringify({
+      user: { uid: apiKey ?? appKey },
+      audio: { data: input.audio_base64 },
+      request: {
+        model_name: model,
+        enable_itn: true,
+        enable_punc: true,
+      },
+    }),
+  });
+
+  const statusCode = response.headers.get("X-Api-Status-Code");
+  if (statusCode === "20000003" || statusCode === "45000002") {
     throw new HttpError(
       422,
       "NO_SPEECH",
       "刚才的片段里没有识别到清晰英语。",
       false,
     );
+  }
+  if (statusCode === "55000031" || response.status === 429) {
+    throw new HttpError(
+      429,
+      "RATE_LIMITED",
+      "豆包语音服务繁忙，请稍后重试。",
+      true,
+    );
+  }
+  if (!response.ok || statusCode !== "20000000") {
+    throw new HttpError(
+      502,
+      "ASR_UPSTREAM_ERROR",
+      "豆包语音识别暂时不可用，请稍后重试。",
+      true,
+    );
+  }
+
+  const raw: unknown = await response.json().catch(() => null);
+  const parsed = DoubaoAsrResponseSchema.safeParse(raw);
+  const transcript = parsed.success ? parsed.data.result.text.trim() : "";
+  if (!transcript) {
+    throw new HttpError(
+      502,
+      "INVALID_UPSTREAM_RESPONSE",
+      "豆包语音返回了无效结果。",
+      true,
+    );
+  }
+  return transcript;
+}
+
+export async function answerQuickAsk(
+  env: Env,
+  input: QuickAskRequest,
+): Promise<QuickAskAnswer> {
+  const transcript = await transcribeWithDoubao(env, input);
 
   const deepSeekBaseUrl = required(
     env.DEEPSEEK_BASE_URL,

@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "corepack pnpm --filter @contextlines/extension dev",
+    "dev:api": "corepack pnpm --filter @contextlines/api dev",
     "build": "corepack pnpm -r --if-present build",
     "typecheck": "corepack pnpm -r --if-present typecheck",
     "lint": "corepack pnpm -r --if-present lint",

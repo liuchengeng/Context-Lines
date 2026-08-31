@@ -22,7 +22,35 @@ corepack pnpm dev
 
 ## 真实模型
 
-Worker 的 `POST /v1/quick-ask` 先使用 Qwen ASR 转写 10 秒 WAV，再使用 DeepSeek 输出简短结构化解释。复制 `.env.example` 中的配置到本地环境；真实密钥不得提交。当前仓库只生成可部署代码，不创建或部署远程资源。
+Worker 的 `POST /v1/quick-ask` 先使用豆包录音文件极速版识别 10 秒 WAV，再使用 DeepSeek 输出简短结构化解释。复制 `.env.example` 中的配置到本地环境；真实密钥不得提交。当前仓库只生成可部署代码，不创建或部署远程资源。
+
+### 本地真实测试配置
+
+创建 `D:\subtitle\apps\api\.dev.vars`，填入：
+
+```env
+ALLOWED_EXTENSION_ID=chrome扩展页面显示的ID
+QUICK_ASK_ACCESS_TOKEN=自己生成的随机长字符串
+DOUBAO_ASR_URL=https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash
+DOUBAO_ASR_RESOURCE_ID=volc.bigasr.auc_turbo
+DOUBAO_ASR_MODEL=bigmodel
+DOUBAO_API_KEY=新版豆包语音控制台的AppKey
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_API_KEY=你的DeepSeek密钥
+```
+
+旧版豆包语音控制台不填写 `DOUBAO_API_KEY`，改填 `DOUBAO_APP_KEY` 和 `DOUBAO_ACCESS_KEY`。
+
+再创建 `D:\subtitle\apps\extension\.env.local`：
+
+```env
+WXT_PUBLIC_USE_MOCKS=false
+WXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8787
+WXT_PUBLIC_QUICK_ASK_ACCESS_TOKEN=与Worker完全相同的随机长字符串
+```
+
+分别在两个 PowerShell 窗口运行 `corepack pnpm dev:api` 和 `corepack pnpm dev`。密钥文件已被 Git 忽略，不要把内容发到聊天中。
 
 ## 检查
 
