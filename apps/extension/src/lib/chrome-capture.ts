@@ -97,7 +97,19 @@ export async function captureActiveTabAudio(): Promise<MediaStream> {
 export async function sendExtensionMessage(
   message: ExtensionMessage,
 ): Promise<void> {
-  await chrome.runtime.sendMessage(message).catch(() => undefined);
+  const response: unknown = await chrome.runtime.sendMessage(message);
+  if (
+    message.type === "capture:started" &&
+    (!response ||
+      typeof response !== "object" ||
+      (response as { ok?: unknown }).ok !== true)
+  ) {
+    throw new CaptureError(
+      "capture-unavailable",
+      "Chrome 未能登记捕获生命周期，已安全停止。",
+      true,
+    );
+  }
 }
 
 export async function getStoredAccessToken(): Promise<string | null> {

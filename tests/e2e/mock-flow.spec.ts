@@ -7,8 +7,9 @@ async function installChromeMocks(
   behavior: CaptureBehavior = "ok",
 ) {
   await context.addInitScript((captureBehavior: CaptureBehavior) => {
-    const memory: Record<string, unknown> = {};
-    const storageArea = {
+    const sessionMemory: Record<string, unknown> = {};
+    const localMemory: Record<string, unknown> = {};
+    const storageArea = (memory: Record<string, unknown>) => ({
       async get(key: string) {
         return { [key]: memory[key] };
       },
@@ -18,11 +19,12 @@ async function installChromeMocks(
       async remove(key: string) {
         delete memory[key];
       },
-    };
+    });
     const runtime: Record<string, unknown> = {
       id: "contextlines-e2e",
       lastError: undefined,
-      sendMessage: async () => undefined,
+      sendMessage: async (message: { type?: string }) =>
+        message.type === "capture:started" ? { ok: true } : undefined,
       onMessage: {
         addListener: () => undefined,
         removeListener: () => undefined,
@@ -62,7 +64,10 @@ async function installChromeMocks(
           callback(destination.stream);
         },
       },
-      storage: { session: storageArea, local: storageArea },
+      storage: {
+        session: storageArea(sessionMemory),
+        local: storageArea(localMemory),
+      },
       identity: {
         getRedirectURL: () =>
           "https://contextlines-e2e.chromiumapp.org/auth-callback",
@@ -70,7 +75,8 @@ async function installChromeMocks(
     };
     Object.assign(globalThis, {
       chrome: mockedChrome,
-      __contextlinesE2eStorage: memory,
+      __contextlinesE2eSessionStorage: sessionMemory,
+      __contextlinesE2eLocalStorage: localMemory,
     });
   }, behavior);
 }
@@ -124,24 +130,30 @@ test("capture, analyze, save, and self-review without persisting a session trans
   );
 
   const privacyState = await page.evaluate(() => {
-    const values = Object.assign(
+    const sessionValues = Object.assign(
       {},
-      (globalThis as any).__contextlinesE2eStorage,
+      (globalThis as any).__contextlinesE2eSessionStorage,
+    );
+    const localValues = Object.assign(
+      {},
+      (globalThis as any).__contextlinesE2eLocalStorage,
     );
     const tracks = (
       globalThis as any
     ).__contextlinesE2eAudio.destination.stream.getTracks() as MediaStreamTrack[];
     return {
-      serializedStorage: JSON.stringify(values),
+      serializedSessionStorage: JSON.stringify(sessionValues),
+      serializedLocalStorage: JSON.stringify(localValues),
       tracksStopped: tracks.every((track) => track.readyState === "ended"),
       horizontalOverflow:
         document.documentElement.scrollWidth >
         document.documentElement.clientWidth,
     };
   });
-  expect(privacyState.serializedStorage).not.toContain(
+  expect(privacyState.serializedSessionStorage).not.toContain(
     "I wouldn't read too much into it.",
   );
+  expect(privacyState.serializedLocalStorage).toBe("{}");
   expect(privacyState.tracksStopped).toBe(true);
   expect(privacyState.horizontalOverflow).toBe(false);
 });

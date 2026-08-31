@@ -48,7 +48,7 @@
 
 - Security/privacy: 永久 OpenAI key 只在 Worker secret；CORS 只允许固定扩展 ID；不发送完整 URL、页面正文或浏览历史。
 - Reliability: 所有外部响应先过 Zod；分析以上下文指纹去重；后一句到达最多静默刷新一次快速分析。
-- Cleanup: 来源切换、导航、Panel 关闭、标签页关闭、音轨结束或退出登录立即停止轨道、PeerConnection 和 AudioContext 并清空内存。
+- Cleanup: 来源切换、导航、Panel 关闭、标签页关闭、音轨结束或退出登录立即停止轨道、PeerConnection 和 AudioContext 并清空内存；捕获注册保存在 `chrome.storage.session`，MV3 worker 重启后仍可恢复生命周期监听。
 
 ## Validation And Release
 
@@ -60,14 +60,16 @@
 
 ## Current Architecture Decisions
 
-| Decision                             | Reason                 | Consequence                      |
-| ------------------------------------ | ---------------------- | -------------------------------- |
-| Side Panel 持有媒体与 PeerConnection | 用户可见且生命周期明确 | Panel 关闭必须清理               |
-| activeTab 动态注入 Shadow DOM        | 最小权限且隔离样式     | 不支持受限 Chrome 页面           |
-| 音频直连 OpenAI                      | Worker 不接触音频      | 上游保留受 OpenAI 项目设置约束   |
-| PGlite 测 SQL                        | 当前机器无 Docker      | 真实 Supabase RLS 留待预发布复验 |
-| PKCE + `launchWebAuthFlow`           | OAuth 留在扩展身份边界 | 稳定扩展 ID 决定固定回调 URL     |
-| 复习只经 `record_review` RPC         | 卡片与事件必须原子更新 | 客户端不能直接插入或更新卡片     |
+| Decision                             | Reason                  | Consequence                             |
+| ------------------------------------ | ----------------------- | --------------------------------------- |
+| Side Panel 持有媒体与 PeerConnection | 用户可见且生命周期明确  | Panel 关闭必须清理                      |
+| activeTab 动态注入 Shadow DOM        | 最小权限且隔离样式      | 不支持受限 Chrome 页面                  |
+| 音频直连 OpenAI                      | Worker 不接触音频       | 上游保留受 OpenAI 项目设置约束          |
+| PGlite 测 SQL                        | 当前机器无 Docker       | 真实 Supabase RLS 留待预发布复验        |
+| PKCE + `launchWebAuthFlow`           | OAuth 留在扩展身份边界  | 稳定扩展 ID 决定固定回调 URL            |
+| 复习只经 `record_review` RPC         | 卡片与事件必须原子更新  | 客户端不能直接插入或更新卡片            |
+| 双层单用户允许列表                   | Supabase 是数据权威边界 | Extension、Worker 与 RLS 都拒绝第二用户 |
+| Auth 只用 `storage.session`          | 禁止持久 session        | 浏览器重启后需要重新登录                |
 
 ## Open Technical Questions
 

@@ -5,17 +5,17 @@ const AUTH_STORAGE_KEY = "contextlines.supabase.auth";
 
 let client: SupabaseClient | null = null;
 
-const chromeStorage = {
+const chromeSessionStorage = {
   async getItem(key: string): Promise<string | null> {
-    const result = await chrome.storage.local.get(key);
+    const result = await chrome.storage.session.get(key);
     const value = result[key];
     return typeof value === "string" ? value : null;
   },
   async setItem(key: string, value: string): Promise<void> {
-    await chrome.storage.local.set({ [key]: value });
+    await chrome.storage.session.set({ [key]: value });
   },
   async removeItem(key: string): Promise<void> {
-    await chrome.storage.local.remove(key);
+    await chrome.storage.session.remove(key);
   },
 };
 
@@ -35,7 +35,7 @@ export function getSupabaseClient(): SupabaseClient {
   client = createClient(url, anonKey, {
     auth: {
       flowType: "pkce",
-      storage: chromeStorage,
+      storage: chromeSessionStorage,
       storageKey: AUTH_STORAGE_KEY,
       persistSession: true,
       autoRefreshToken: true,
@@ -43,6 +43,10 @@ export function getSupabaseClient(): SupabaseClient {
     },
   });
   return client;
+}
+
+export async function clearAuthSessionStorage(): Promise<void> {
+  await chrome.storage.session.remove([AUTH_STORAGE_KEY, ACCESS_TOKEN_KEY]);
 }
 
 export async function syncWorkerAccessToken(

@@ -4,10 +4,7 @@ import {
   type TranscriptLine,
 } from "@contextlines/contracts";
 
-interface ActiveCapture {
-  tabId: number;
-  stopRequested: boolean;
-}
+import { CaptureRegistry } from "../lib/capture-registry";
 
 function renderSubtitleOverlay(lines: TranscriptLine[]): void {
   const hostId = "contextlines-caption-host";
@@ -76,7 +73,7 @@ async function executeOverlay(tabId: number, lines: TranscriptLine[]) {
 }
 
 export default defineBackground(() => {
-  let activeCapture: ActiveCapture | null = null;
+  const captureRegistry = new CaptureRegistry(chrome.storage.session);
 
   void browser.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })
@@ -89,58 +86,80 @@ export default defineBackground(() => {
       ExtensionMessage,
       { type: "capture:stop-requested" }
     >["reason"],
+    tabId: number,
   ) => {
-    if (!activeCapture || activeCapture.stopRequested) return;
-    activeCapture.stopRequested = true;
-    await chrome.runtime
-      .sendMessage({ type: "capture:stop-requested", reason })
-      .catch(() => undefined);
+    const activeCapture = await captureRegistry.markStopRequested(tabId);
+    if (!activeCapture) return;
+    try {
+      await chrome.runtime.sendMessage({
+        type: "capture:stop-requested",
+        reason,
+      });
+    } catch {
+      await captureRegistry.clear(tabId).catch(() => undefined);
+    }
   };
 
-  chrome.runtime.onMessage.addListener((rawMessage: unknown) => {
-    const parsed = ExtensionMessageSchema.safeParse(rawMessage);
-    if (!parsed.success) return;
-    const message = parsed.data;
+  chrome.runtime.onMessage.addListener(
+    (rawMessage: unknown, _sender, sendResponse) => {
+      const parsed = ExtensionMessageSchema.safeParse(rawMessage);
+      if (!parsed.success) return;
+      const message = parsed.data;
 
-    if (message.type === "capture:started") {
-      activeCapture = { tabId: message.tab_id, stopRequested: false };
+      if (message.type === "capture:started") {
+        void captureRegistry.start(message.tab_id).then(
+          () => sendResponse({ ok: true }),
+          () => sendResponse({ ok: false }),
+        );
+        return true;
+      }
+
+      if (message.type === "capture:stopped") {
+        void captureRegistry.clear(message.tab_id).then(
+          () => sendResponse({ ok: true }),
+          () => sendResponse({ ok: false }),
+        );
+        void executeOverlay(message.tab_id, []).catch(() => undefined);
+        return true;
+      }
+
+      if (message.type === "overlay:update") {
+        void executeOverlay(message.tab_id, message.lines).catch(
+          () => undefined,
+        );
+        return;
+      }
+
+      if (message.type === "overlay:clear") {
+        void executeOverlay(message.tab_id, []).catch(() => undefined);
+      }
       return;
-    }
-
-    if (message.type === "capture:stopped") {
-      if (activeCapture?.tabId === message.tab_id) activeCapture = null;
-      void executeOverlay(message.tab_id, []).catch(() => undefined);
-      return;
-    }
-
-    if (message.type === "overlay:update") {
-      void executeOverlay(message.tab_id, message.lines).catch(() => undefined);
-      return;
-    }
-
-    if (message.type === "overlay:clear") {
-      void executeOverlay(message.tab_id, []).catch(() => undefined);
-    }
-  });
+    },
+  );
 
   chrome.tabs.onActivated.addListener(({ tabId }) => {
-    if (activeCapture && activeCapture.tabId !== tabId) {
-      void requestStop("active-tab-changed");
-    }
+    void captureRegistry.get().then((activeCapture) => {
+      if (activeCapture && activeCapture.tabId !== tabId) {
+        return requestStop("active-tab-changed", activeCapture.tabId);
+      }
+    });
   });
 
   chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-    if (
-      activeCapture?.tabId === tabId &&
-      (changeInfo.url !== undefined || changeInfo.status === "loading")
-    ) {
-      void requestStop("source-navigation");
+    if (changeInfo.url !== undefined || changeInfo.status === "loading") {
+      void captureRegistry.get().then((activeCapture) => {
+        if (activeCapture?.tabId === tabId) {
+          return requestStop("source-navigation", tabId);
+        }
+      });
     }
   });
 
   chrome.tabs.onRemoved.addListener((tabId) => {
-    if (activeCapture?.tabId === tabId) {
-      void requestStop("source-tab-closed");
-    }
+    void captureRegistry.get().then((activeCapture) => {
+      if (activeCapture?.tabId === tabId) {
+        return requestStop("source-tab-closed", tabId);
+      }
+    });
   });
 });

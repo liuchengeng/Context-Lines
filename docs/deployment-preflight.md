@@ -17,8 +17,10 @@
 2. 配置 Google provider；Google OAuth client 的授权回调使用 Supabase Auth callback。
 3. 在 Supabase Auth redirect allow list 中加入稳定 Chromium callback。
 4. 审查并应用 `supabase/migrations/202608310001_contextlines_learning.sql`。
-5. 用允许邮箱和第二个拒绝邮箱验证登录边界。
-6. 以两个真实 Auth 用户验证三张表的 RLS 隔离、触发器、`record_review` 原子更新和删除级联。
+5. 允许邮箱首次完成 Google Auth 后，从 Supabase Auth 用户列表核对其 UUID；由管理员将该 UUID 与邮箱写入 `public.allowed_users`。不要向客户端授予此表权限。
+6. 将同一邮箱配置为扩展构建变量 `WXT_PUBLIC_ALLOWED_EMAIL` 和 Worker 变量 `ALLOWED_EMAIL`。
+7. 用允许邮箱和第二个拒绝邮箱验证 Extension、Worker、RLS/RPC 三层登录边界。
+8. 以两个真实 Auth 用户验证三张学习表的 RLS 隔离、触发器、`record_review` 原子更新和删除级联。
 
 待应用迁移只有一项：`202608310001_contextlines_learning.sql`。执行前必须再次核对目标项目和备份/回滚策略。
 
@@ -35,6 +37,8 @@
 - `OPENAI_TRANSCRIPTION_MODEL`
 - `OPENAI_QUICK_ANALYSIS_MODEL`
 - `OPENAI_DEEP_ANALYSIS_MODEL`
+
+扩展公开构建变量另包括 `WXT_PUBLIC_SUPABASE_URL`、`WXT_PUBLIC_SUPABASE_ANON_KEY`、`WXT_PUBLIC_ALLOWED_EMAIL`、`WXT_PUBLIC_API_BASE_URL` 和稳定 `WXT_PUBLIC_EXTENSION_KEY`。Auth 会话只保存在内存型 `chrome.storage.session`，浏览器重启后重新登录。
 
 secret：
 

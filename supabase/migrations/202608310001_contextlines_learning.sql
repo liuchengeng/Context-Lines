@@ -1,5 +1,28 @@
 create extension if not exists pgcrypto;
 
+create table public.allowed_users (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  email text not null unique check (char_length(btrim(email)) between 3 and 320),
+  created_at timestamptz not null default now()
+);
+
+revoke all on public.allowed_users from public, anon, authenticated;
+
+create function public.is_contextlines_allowed_user()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from public.allowed_users where user_id = auth.uid()
+  )
+$$;
+
+revoke all on function public.is_contextlines_allowed_user() from public;
+grant execute on function public.is_contextlines_allowed_user() to authenticated;
+
 create table public.saved_expressions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -122,6 +145,10 @@ declare
   current_card public.review_cards;
   updated_card public.review_cards;
 begin
+  if not public.is_contextlines_allowed_user() then
+    raise exception 'user is not allowed' using errcode = '42501';
+  end if;
+
   if p_rating not between 1 and 4 then
     raise exception 'invalid review rating' using errcode = '22023';
   end if;
@@ -181,16 +208,24 @@ alter table public.review_events enable row level security;
 
 create policy saved_expressions_owner_all on public.saved_expressions
 for all to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
+using (
+  user_id = auth.uid() and public.is_contextlines_allowed_user()
+)
+with check (
+  user_id = auth.uid() and public.is_contextlines_allowed_user()
+);
 
 create policy review_cards_owner_select on public.review_cards
 for select to authenticated
-using (user_id = auth.uid());
+using (
+  user_id = auth.uid() and public.is_contextlines_allowed_user()
+);
 
 create policy review_events_owner_select on public.review_events
 for select to authenticated
-using (user_id = auth.uid());
+using (
+  user_id = auth.uid() and public.is_contextlines_allowed_user()
+);
 
 revoke all on function public.record_review(
   uuid, integer, smallint, timestamptz, double precision, double precision,

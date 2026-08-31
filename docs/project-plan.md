@@ -19,13 +19,13 @@
 | Capture vertical slice | 标签页音频捕获、回放、partial/final 与清理        | implemented | 单测、构建、mock Chrome 渲染；真实安装流程待质量门禁 |
 | Analysis and Study     | 点句快速/深入分析、缓存和 schema 防线             | complete    | 19 项单元/契约测试、构建、320/400/600 Chrome 渲染    |
 | Cloud and Review       | OAuth、RLS、收藏、三卡和 FSRS                     | implemented | PGlite 约束/RPC 测试；静音 mock 收藏与复习浏览器流程 |
-| Quality gate           | 自动测试、Chrome 流程、100 条评测、打包和独立审查 | in progress | 自动门禁与打包完成；等待独立只读审查                 |
+| Quality gate           | 自动测试、Chrome 流程、100 条评测、打包和独立审查 | in progress | 修正后完整门禁与打包通过；等待独立复审               |
 | Deployment preflight   | 远程配置与验证清单，停止等待授权                  | complete    | `docs/deployment-preflight.md`                       |
 
 ## Active Work
 
-- Now: 由无构建上下文的独立代理复现质量证据并审查阻塞项。
-- Next: 修复审查问题后重新跑标准门禁；随后停止等待远程授权。
+- Now: 独立审查发现的 MV3 状态恢复、数据库单用户边界、非持久 Auth 和即时退出清理已修复，等待独立复审。
+- Next: 独立复审通过后，停止等待远程授权。
 - Deferred: 真实 Supabase/Cloudflare/OpenAI 验收与所有远程操作。
 
 ## Blockers And Decisions

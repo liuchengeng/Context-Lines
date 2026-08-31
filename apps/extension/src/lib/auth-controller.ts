@@ -1,6 +1,10 @@
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
-import { getSupabaseClient, syncWorkerAccessToken } from "./supabase";
+import {
+  clearAuthSessionStorage,
+  getSupabaseClient,
+  syncWorkerAccessToken,
+} from "./supabase";
 
 export interface AuthUser {
   id: string;
@@ -28,6 +32,17 @@ function userFromSession(session: Session | null): AuthUser | null {
   return session && email ? { id: session.user.id, email } : null;
 }
 
+export function isAllowedAuthEmail(
+  email: string,
+  allowedEmail: string | null | undefined,
+): boolean {
+  const normalizedAllowed = allowedEmail?.trim().toLocaleLowerCase("en-US");
+  return Boolean(
+    normalizedAllowed &&
+    email.trim().toLocaleLowerCase("en-US") === normalizedAllowed,
+  );
+}
+
 function launchGoogleFlow(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     chrome.identity.launchWebAuthFlow(
@@ -48,11 +63,17 @@ function launchGoogleFlow(url: string): Promise<string> {
 
 export class AuthController {
   readonly #listeners = new Set<AuthListener>();
+  readonly #allowedEmail: string | null;
   #state: AuthState;
   #unsubscribe: (() => void) | null = null;
   #operation = 0;
 
-  constructor(private readonly useMocks: boolean) {
+  constructor(
+    private readonly useMocks: boolean,
+    allowedEmail = import.meta.env.WXT_PUBLIC_ALLOWED_EMAIL,
+  ) {
+    this.#allowedEmail =
+      allowedEmail?.trim().toLocaleLowerCase("en-US") || null;
     this.#state = useMocks
       ? { phase: "signed-in", user: MOCK_USER, error: null }
       : { phase: "loading", user: null, error: null };
@@ -152,13 +173,13 @@ export class AuthController {
 
   async signOut(): Promise<void> {
     ++this.#operation;
-    if (!this.useMocks) {
-      await getSupabaseClient()
-        .auth.signOut()
-        .catch(() => undefined);
-      await syncWorkerAccessToken(null).catch(() => undefined);
-    }
     this.#setState({ phase: "signed-out", user: null, error: null });
+    if (!this.useMocks) {
+      await clearAuthSessionStorage().catch(() => undefined);
+      await getSupabaseClient()
+        .auth.signOut({ scope: "local" })
+        .catch(() => undefined);
+    }
   }
 
   dispose(): void {
@@ -169,6 +190,24 @@ export class AuthController {
 
   async #acceptSession(session: Session | null): Promise<void> {
     const user = userFromSession(session);
+    if (user && !this.#allowedEmail) {
+      await clearAuthSessionStorage().catch(() => undefined);
+      this.#setState({
+        phase: "error",
+        user: null,
+        error: "允许邮箱尚未配置。",
+      });
+      return;
+    }
+    if (user && !isAllowedAuthEmail(user.email, this.#allowedEmail)) {
+      await clearAuthSessionStorage().catch(() => undefined);
+      this.#setState({
+        phase: "error",
+        user: null,
+        error: "此 Google 邮箱不在 ContextLines 允许列表中。",
+      });
+      return;
+    }
     await syncWorkerAccessToken(session?.access_token ?? null);
     this.#setState({
       phase: user ? "signed-in" : "signed-out",

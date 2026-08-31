@@ -43,6 +43,7 @@ describe("ContextLines learning migration", () => {
     db = new PGlite({ extensions: { pgcrypto } });
     await db.exec(`
       create schema auth;
+      create role anon;
       create role authenticated;
       create table auth.users (id uuid primary key);
       create function auth.uid() returns uuid language sql stable as $$
@@ -52,6 +53,10 @@ describe("ContextLines learning migration", () => {
       select set_config('request.jwt.claim.sub', '${userId}', false);
     `);
     await db.exec(migration);
+    await db.query(
+      "insert into public.allowed_users (user_id, email) values ($1, $2)",
+      [userId, "learner@example.com"],
+    );
   });
 
   afterEach(async () => {
@@ -147,5 +152,30 @@ describe("ContextLines learning migration", () => {
       [expressionId],
     );
     expect(cards.rows[0]?.count).toBe(0);
+  });
+
+  it("rejects a second authenticated user at the database authority boundary", async () => {
+    const otherUserId = "00000000-0000-4000-8000-000000000002";
+    await db.query("insert into auth.users (id) values ($1)", [otherUserId]);
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [
+      otherUserId,
+    ]);
+
+    const allowed = await db.query<{ allowed: boolean }>(
+      "select public.is_contextlines_allowed_user() as allowed",
+    );
+    expect(allowed.rows[0]?.allowed).toBe(false);
+
+    await expect(
+      db.query(
+        `select * from public.record_review(
+          $1::uuid, 0::integer, 3::smallint, now(),
+          1::double precision, 5::double precision,
+          0::integer, 1::integer, 0::integer, 1::integer, 0::integer,
+          1::smallint, now(), '{}'::jsonb, '{}'::jsonb
+        )`,
+        ["30000000-0000-4000-8000-000000000001"],
+      ),
+    ).rejects.toThrow(/user is not allowed/);
   });
 });

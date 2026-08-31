@@ -219,11 +219,13 @@ export class CaptureController {
       const source = this.#state.source;
       this.#setState({ ...this.#state, lines });
       if (source) {
-        void this.dependencies.sendMessage({
-          type: "overlay:update",
-          tab_id: source.id,
-          lines: lines.slice(-4),
-        });
+        void this.dependencies
+          .sendMessage({
+            type: "overlay:update",
+            tab_id: source.id,
+            lines: lines.slice(-4),
+          })
+          .catch(() => undefined);
       }
     } catch (error) {
       const captureError =
@@ -250,14 +252,18 @@ export class CaptureController {
 
     if (source) {
       await Promise.all([
-        this.dependencies.sendMessage({
-          type: "overlay:clear",
-          tab_id: source.id,
-        }),
-        this.dependencies.sendMessage({
-          type: "capture:stopped",
-          tab_id: source.id,
-        }),
+        this.dependencies
+          .sendMessage({
+            type: "overlay:clear",
+            tab_id: source.id,
+          })
+          .catch(() => undefined),
+        this.dependencies
+          .sendMessage({
+            type: "capture:stopped",
+            tab_id: source.id,
+          })
+          .catch(() => undefined),
       ]);
     }
   }
