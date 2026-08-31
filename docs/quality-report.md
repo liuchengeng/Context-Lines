@@ -13,6 +13,7 @@
 | Responsive UI               | pass   | 320、400、600px 无横向溢出，Flow/Study/Review 均已渲染检查         |
 | Synthetic evals             | pass   | 100/100 schema；8 类各至少 10 条；外部事实无伪装为已核实           |
 | Extension package           | pass   | WXT Chrome zip 已在本地生成                                        |
+| Independent review          | pass   | 原四项安全阻塞修正后，同一独立只读代理复审并返回 `pass`            |
 
 ## Privacy checks
 
@@ -21,7 +22,7 @@
 - Supabase Auth session/refresh token 不写入 `chrome.storage.local`；浏览器重启会要求重新登录。
 - E2E 在停止会话后确认扩展持久存储不包含完整测试台词。
 - schema 中不存在 session、audio、完整 transcript 或 browsing-history 持久化对象。
-- Supabase migration 只创建 `saved_expressions`、`review_cards`、`review_events`；保存内容必须由用户明确选择表达块并填写包含该表达的个人例句。
+- Supabase migration 创建私有允许列表及 `saved_expressions`、`review_cards`、`review_events`；不创建 session、audio、完整 transcript 或 browsing-history 表。保存内容必须由用户明确选择表达块并填写包含该表达的个人例句。
 
 ## Environment-limited gates
 
