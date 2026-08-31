@@ -205,18 +205,27 @@ async function updateOverlay(
       style.textContent = `
         :host { color-scheme: dark; }
         * { box-sizing: border-box; }
-        .card { position: relative; max-height: 44vh; overflow: auto; padding: 14px 40px 14px 15px; border: 1px solid rgba(255,255,255,.17); border-radius: 10px; background: rgba(9,10,12,.96); color: #f5f5f5; box-shadow: 0 8px 28px rgba(0,0,0,.38); font: 13px/1.55 Inter,"Segoe UI",system-ui,sans-serif; backdrop-filter: blur(10px); }
+        .card { position: relative; max-height: 52vh; overflow: auto; padding: 14px 40px 14px 15px; border: 1px solid rgba(255,255,255,.17); border-radius: 10px; background: rgba(9,10,12,.97); color: #f5f5f5; box-shadow: 0 8px 28px rgba(0,0,0,.38); font: 13px/1.55 Inter,"Segoe UI",system-ui,sans-serif; backdrop-filter: blur(10px); }
         .close { position: absolute; top: 7px; right: 7px; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #9b9da2; font: 20px/1 system-ui; cursor: pointer; }
         .close:hover { background: #26282c; color: #fff; }
-        .label { margin: 0 0 5px; color: #8f9297; font-size: 11px; }
-        .paused { margin: 0 0 9px; color: #72d69a; font-size: 11px; }
-        h2 { margin: 0 0 11px; color: #fff; font-size: 16px; line-height: 1.42; }
-        .phrase { margin: 0 0 5px; color: #fff; font-weight: 700; }
+        .label { margin: 12px 0 4px; color: #8f9297; font-size: 11px; font-weight: 650; letter-spacing: .02em; }
+        .label:first-of-type { margin-top: 0; }
+        .label-phrase { color: #80adf8; }
+        .label-meaning { color: #68cc91; }
+        .paused { margin: 0 0 9px; color: #e2bd72; font-size: 11px; }
+        h2 { margin: 0; color: #9bc1ff; font-size: 18px; line-height: 1.4; }
+        .meaning { margin-top: 3px; color: #82dfa7; font-size: 15px; }
         p { margin: 0; color: #d5d6d8; }
-        .detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid #292b2e; color: #b9bbc0; }
+        .detail { color: #c5c7ca; }
         .loading { display: flex; align-items: center; min-height: 32px; color: #c8c9cc; }
-        .dot { width: 7px; height: 7px; margin-right: 9px; border-radius: 50%; background: #fff; animation: pulse .8s ease-in-out infinite alternate; }
+        .dot { width: 7px; height: 7px; margin-right: 9px; border-radius: 50%; background: #8bb8ff; animation: pulse .8s ease-in-out infinite alternate; }
         .error { color: #ffb1b1; }
+        details { margin-top: 13px; padding-top: 10px; border-top: 1px solid #292b2e; }
+        summary { color: #979a9f; font-size: 11px; cursor: pointer; user-select: none; }
+        .transcript { margin-top: 8px; color: #b9bbc0; }
+        .resume { width: 100%; height: 34px; margin-top: 13px; border: 1px solid #8bb8ff; border-radius: 7px; background: #8bb8ff; color: #07101f; font: 650 12px/1 Inter,"Segoe UI",system-ui,sans-serif; cursor: pointer; }
+        .resume:hover { background: #a6c9ff; }
+        .hint { margin-top: 7px; color: #74777c; font-size: 10px; text-align: center; }
         @keyframes pulse { to { opacity: .25; } }
       `;
       const card = document.createElement("section");
@@ -247,17 +256,40 @@ async function updateOverlay(
         loading.className = "loading";
         const dot = document.createElement("span");
         dot.className = "dot";
-        loading.append(dot, "正在解释刚才听到的英语…");
+        loading.append(dot, "正在识别刚才约 10 秒，并挑出需要解释的表达…");
         card.append(loading);
       } else if (nextView.status === "error") {
+        addText("p", "处理没有完成", "label");
         addText("p", nextView.message, "error");
       } else {
-        addText("p", "刚才听到", "label");
-        addText("h2", nextView.answer.transcript);
-        addText("p", nextView.answer.phrase, "phrase");
-        addText("p", nextView.answer.meaning_zh);
+        addText("p", "自动选中的英文表达", "label label-phrase");
+        addText("h2", nextView.answer.phrase);
+        addText("p", "中文意思", "label label-meaning");
+        addText("p", nextView.answer.meaning_zh, "meaning");
+        addText("p", "在这句话里", "label");
         addText("p", nextView.answer.context_zh, "detail");
+        addText("p", "通常怎么用", "label");
         addText("p", nextView.answer.usage_zh, "detail");
+
+        const details = document.createElement("details");
+        const summary = document.createElement("summary");
+        summary.textContent = "查看识别到的完整英文";
+        const transcript = document.createElement("p");
+        transcript.className = "transcript";
+        transcript.textContent = nextView.answer.transcript;
+        details.append(summary, transcript);
+        card.append(details);
+      }
+      if (nextView.status !== "loading") {
+        const resume = document.createElement("button");
+        resume.className = "resume";
+        resume.type = "button";
+        resume.textContent = host.contextLinesShouldResume
+          ? "关闭并继续播放"
+          : "关闭";
+        resume.addEventListener("click", () => resumeAndRemove(host));
+        card.append(resume);
+        addText("p", "也可以再按一次 Alt+Q", "hint");
       }
       shadow.append(style, card);
       const container = document.fullscreenElement ?? document.documentElement;
