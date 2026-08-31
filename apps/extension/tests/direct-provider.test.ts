@@ -33,6 +33,7 @@ describe("direct provider", () => {
       await makeDoubaoAudioPacket(new Uint8Array([1, 2]), 3, true),
     );
     expect(packet[1]).toBe(0x23);
+    expect(packet[2]).toBe(0x01);
     expect(new DataView(packet.buffer).getInt32(4, false)).toBe(-3);
   });
 

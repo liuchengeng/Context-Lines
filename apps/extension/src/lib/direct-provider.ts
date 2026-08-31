@@ -111,6 +111,7 @@ function makePacket(
   messageType: number,
   flags: number,
   serialization: number,
+  compression: number,
   payload: Uint8Array,
   sequence?: number,
 ): ArrayBuffer {
@@ -120,7 +121,7 @@ function makePacket(
   );
   packet[0] = 0x11;
   packet[1] = (messageType << 4) | flags;
-  packet[2] = serialization << 4;
+  packet[2] = (serialization << 4) | compression;
   packet[3] = 0;
   const view = new DataView(packet.buffer);
   let offset = 4;
@@ -156,7 +157,7 @@ export async function makeDoubaoRequestPacket(): Promise<ArrayBuffer> {
       }),
     ),
   );
-  return makePacket(0b0001, 0b0001, 0b0001, payload, 1);
+  return makePacket(0b0001, 0b0001, 0b0001, 0b0001, payload, 1);
 }
 
 export async function makeDoubaoAudioPacket(
@@ -168,6 +169,7 @@ export async function makeDoubaoAudioPacket(
     0b0010,
     isLast ? 0b0011 : 0b0001,
     0,
+    0b0001,
     await gzip(audio),
     isLast ? -sequence : sequence,
   );
