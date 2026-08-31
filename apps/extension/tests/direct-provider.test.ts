@@ -23,18 +23,20 @@ function makeServerPacket(payload: unknown): ArrayBuffer {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("direct provider", () => {
-  it("extracts PCM and marks the final audio packet with a negative sequence", async () => {
+  it("extracts PCM and marks the final audio packet without a sequence", async () => {
     const wav = new Uint8Array(
       encodeMonoWav(new Float32Array([0, 0.5, -0.5]), 16_000),
     );
     expect(extractPcmFromWav(wav)).toHaveLength(6);
 
     const packet = new Uint8Array(
-      await makeDoubaoAudioPacket(new Uint8Array([1, 2]), 3, true),
+      await makeDoubaoAudioPacket(new Uint8Array([1, 2]), true),
     );
-    expect(packet[1]).toBe(0x23);
+    expect(packet[1]).toBe(0x22);
     expect(packet[2]).toBe(0x01);
-    expect(new DataView(packet.buffer).getInt32(4, false)).toBe(-3);
+    expect(new DataView(packet.buffer).getUint32(4, false)).toBe(
+      packet.byteLength - 8,
+    );
   });
 
   it("reads current and wrapped Doubao transcript shapes", () => {
@@ -76,7 +78,7 @@ describe("direct provider", () => {
 
       send(data: ArrayBuffer) {
         const bytes = new Uint8Array(data);
-        if (bytes[1] === 0x23) {
+        if (bytes[1] === 0x22) {
           queueMicrotask(() => {
             this.onmessage?.(
               new MessageEvent("message", {

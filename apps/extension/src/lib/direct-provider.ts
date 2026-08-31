@@ -157,22 +157,14 @@ export async function makeDoubaoRequestPacket(): Promise<ArrayBuffer> {
       }),
     ),
   );
-  return makePacket(0b0001, 0b0001, 0b0001, 0b0001, payload, 1);
+  return makePacket(0b0001, 0, 0b0001, 0b0001, payload);
 }
 
 export async function makeDoubaoAudioPacket(
   audio: Uint8Array,
-  sequence: number,
   isLast: boolean,
 ): Promise<ArrayBuffer> {
-  return makePacket(
-    0b0010,
-    isLast ? 0b0011 : 0b0001,
-    0,
-    0b0001,
-    await gzip(audio),
-    isLast ? -sequence : sequence,
-  );
+  return makePacket(0b0010, isLast ? 0b0010 : 0, 0, 0b0001, await gzip(audio));
 }
 
 async function decodePayload(
@@ -484,11 +476,7 @@ async function transcribeOnce(
             const start = index * AUDIO_CHUNK_BYTES;
             const chunk = pcm.slice(start, start + AUDIO_CHUNK_BYTES);
             socket.send(
-              await makeDoubaoAudioPacket(
-                chunk,
-                index + 2,
-                index === count - 1,
-              ),
+              await makeDoubaoAudioPacket(chunk, index === count - 1),
             );
           }
         })().catch((error: unknown) => {
