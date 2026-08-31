@@ -77,15 +77,16 @@ describe("direct provider", () => {
       send(data: ArrayBuffer) {
         const bytes = new Uint8Array(data);
         if (bytes[1] === 0x23) {
-          queueMicrotask(() =>
+          queueMicrotask(() => {
             this.onmessage?.(
               new MessageEvent("message", {
                 data: makeServerPacket({
                   result: { text: "Not a chance." },
                 }),
               }),
-            ),
-          );
+            );
+            this.onclose?.();
+          });
         }
       }
 

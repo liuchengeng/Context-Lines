@@ -405,6 +405,7 @@ async function transcribeOnce(
       socket.binaryType = "arraybuffer";
       let latestTranscript = "";
       let settled = false;
+      let messageTail: Promise<void> = Promise.resolve();
       const finish = (error?: Error) => {
         if (settled) return;
         settled = true;
@@ -443,8 +444,9 @@ async function transcribeOnce(
         });
       };
       socket.onmessage = (event: MessageEvent<ArrayBuffer>) => {
-        void parseDoubaoPacket(event.data).then(
-          (payload) => {
+        messageTail = messageTail
+          .then(async () => {
+            const payload = await parseDoubaoPacket(event.data);
             const transcript = extractTranscript(payload);
             if (transcript) latestTranscript = transcript;
             const isLast = nestedRecord(payload, "is_last_package") === true;
@@ -452,23 +454,24 @@ async function transcribeOnce(
               socket.close();
               finish();
             }
-          },
-          (error: unknown) => {
+          })
+          .catch((error: unknown) => {
             socket.close();
             finish(
               error instanceof Error
                 ? error
                 : new Error("豆包语音识别返回异常。"),
             );
-          },
-        );
+          });
       };
       socket.onerror = () => {
         setTimeout(() => {
           finish(new Error(formatHandshakeError(handshake.diagnostic)));
         }, 100);
       };
-      socket.onclose = () => finish();
+      socket.onclose = () => {
+        void messageTail.then(() => finish());
+      };
     });
   } finally {
     handshake.cleanup();
