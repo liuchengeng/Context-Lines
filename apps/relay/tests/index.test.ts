@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import worker, { parseRelaySubprotocol, type Env } from "../src/index";
+import worker, {
+  DOUBAO_RESOURCE_ID,
+  parseRelaySubprotocol,
+  type Env,
+} from "../src/index";
 
 const env: Env = {
   DOUBAO_APP_ID: "123456789",
@@ -23,6 +27,10 @@ function request(path: string, init?: RequestInit): Request {
 afterEach(() => vi.restoreAllMocks());
 
 describe("relay worker", () => {
+  it("targets the enabled Doubao ASR 2.0 hourly resource", () => {
+    expect(DOUBAO_RESOURCE_ID).toBe("volc.seedasr.sauc.duration");
+  });
+
   it("accepts only the expected WebSocket protocol token", () => {
     expect(
       parseRelaySubprotocol(

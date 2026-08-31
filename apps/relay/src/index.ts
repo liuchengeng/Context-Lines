@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const DOUBAO_URL =
   "https://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream";
-const DOUBAO_RESOURCE_ID = "volc.bigasr.sauc.duration";
+export const DOUBAO_RESOURCE_ID = "volc.seedasr.sauc.duration";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const RELAY_PROTOCOL = "contextlines";
 const MAX_QUEUED_BYTES = 1024 * 1024;
@@ -179,7 +179,15 @@ async function connectDoubao(clientSocket: WebSocket, env: Env): Promise<void> {
 
     upstream = response.webSocket;
     upstream.addEventListener("message", (event) => {
-      if (clientSocket.readyState === 1) clientSocket.send(event.data);
+      if (clientSocket.readyState !== 1) return;
+      if (typeof event.data === "string") {
+        const detail = safeHeader(event.data) || "空文本消息";
+        sendRelayError(clientSocket, `豆包返回文本错误：${detail}`);
+        closeSocket(clientSocket);
+        closeSocket(upstream!);
+        return;
+      }
+      clientSocket.send(event.data);
     });
     upstream.addEventListener("close", (event) => {
       if (clientSocket.readyState < 2) {

@@ -35,7 +35,7 @@ corepack pnpm --filter @contextlines/relay exec wrangler secret put DEEPSEEK_API
 corepack pnpm --filter @contextlines/relay exec wrangler secret put RELAY_TOKEN
 ```
 
-其中 `RELAY_TOKEN` 填刚生成的随机口令。豆包使用流式语音识别大模型小时版的 APP ID 与 Access Token，Secret Key 不需要。
+其中 `RELAY_TOKEN` 填刚生成的随机口令。豆包使用流式语音识别大模型 2.0 小时版的 APP ID 与 Access Token，资源 ID 为 `volc.seedasr.sauc.duration`，Secret Key 不需要。
 
 最后部署：
 
