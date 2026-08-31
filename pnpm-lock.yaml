@@ -41,6 +41,9 @@ importers:
       "@electric-sql/pglite":
         specifier: ^0.3.14
         version: 0.3.16
+      "@types/node":
+        specifier: ^24.10.0
+        version: 24.13.3
       typescript:
         specifier: ^5.9.2
         version: 5.9.3

@@ -59,7 +59,8 @@ button {
 
 .brand-lockup,
 .status-label,
-.section-heading-row {
+.section-heading-row,
+.header-actions {
   display: flex;
   align-items: center;
 }
@@ -92,6 +93,24 @@ button {
   color: #8c8f94;
   font-size: 11px;
   font-weight: 500;
+}
+
+.header-actions {
+  gap: 9px;
+}
+
+.account-button {
+  min-height: 25px;
+  padding: 0 7px;
+  border: 1px solid #292b2e;
+  border-radius: 5px;
+  color: #a8aaae;
+  background: #121314;
+  font-size: 10px;
+}
+
+.account-button:disabled {
+  color: #73767b;
 }
 
 .status-dot {
@@ -216,6 +235,26 @@ h2 {
   color: #a8aaae;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.auth-notice {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 12px;
+  padding: 9px 10px;
+  border-left: 2px solid #79b8ff;
+  background: #121314;
+}
+
+.auth-notice strong {
+  color: #f4f4f6;
+  font-size: 11px;
+}
+
+.auth-notice span {
+  color: #8c8f94;
+  font-size: 10px;
+  line-height: 1.5;
 }
 
 .button-primary,
@@ -390,7 +429,7 @@ h2 {
   letter-spacing: 0.04em;
 }
 
-.study-panel {
+.focused-panel {
   display: block;
 }
 
@@ -545,6 +584,64 @@ h2 {
   text-align: center;
 }
 
+.save-expression-form {
+  display: grid;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 11px;
+  border: 1px solid #292b2e;
+  border-radius: 6px;
+  background: #0d0d0d;
+}
+
+.save-expression-form label {
+  color: #f4f4f6;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.save-expression-form textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #3a3d41;
+  border-radius: 5px;
+  padding: 8px 9px;
+  color: #f4f4f6;
+  background: #07080a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.save-expression-form textarea::placeholder {
+  color: #5f6267;
+}
+
+.form-help,
+.form-error,
+.form-success {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.form-help {
+  color: #73767b;
+}
+
+.form-error {
+  color: #ff9a9a;
+}
+
+.form-success {
+  color: #72d69a;
+}
+
+.save-button {
+  width: auto;
+  justify-self: start;
+  padding: 0 12px;
+}
+
 .muted-copy,
 .study-empty p {
   margin: 0;
@@ -635,6 +732,125 @@ h2 {
   font-size: 11px;
 }
 
+.review-content {
+  display: grid;
+  max-width: 680px;
+  gap: 14px;
+  margin: 0 auto;
+}
+
+.review-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.review-header > span {
+  padding: 3px 6px;
+  border: 1px solid #292b2e;
+  border-radius: 4px;
+  color: #8c8f94;
+  background: #121314;
+  font-size: 10px;
+}
+
+.review-prompt {
+  display: grid;
+  min-height: 190px;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid #292b2e;
+  border-radius: 8px;
+  background: #0d0d0d;
+  text-align: center;
+}
+
+.review-prompt p {
+  margin: 0;
+  color: #8c8f94;
+  font-size: 11px;
+}
+
+.review-prompt strong {
+  max-width: 540px;
+  color: #f4f4f6;
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+.reveal-button {
+  justify-self: center;
+  width: auto;
+  min-width: 150px;
+  padding: 0 16px;
+}
+
+.review-answer {
+  padding: 13px 14px;
+  border-left: 2px solid #72d69a;
+  background: #0d0d0d;
+}
+
+.review-answer > p:not(.eyebrow) {
+  margin: 5px 0 0;
+  color: #f4f4f6;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.rating-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.rating-grid button {
+  min-height: 34px;
+  border: 1px solid #3a3d41;
+  border-radius: 5px;
+  color: #c8c9cc;
+  background: #121314;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rating-grid button:hover:not(:disabled) {
+  color: #f4f4f6;
+  border-color: #5f6267;
+  background: #18191b;
+}
+
+.review-empty {
+  display: grid;
+  min-height: 280px;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 24px;
+  border: 1px dashed #292b2e;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.review-empty p,
+.review-status {
+  max-width: 360px;
+  margin: 0;
+  color: #8c8f94;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.refresh-button {
+  width: auto;
+  min-width: 92px;
+  margin-top: 6px;
+  padding: 0 12px;
+}
+
 @keyframes analysis-pulse {
   to {
     opacity: 0.25;
@@ -675,7 +891,7 @@ h2 {
     grid-row: 1 / span 4;
   }
 
-  .panel-content.study-panel {
+  .panel-content.focused-panel {
     display: block;
   }
 

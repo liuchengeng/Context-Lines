@@ -1,5 +1,6 @@
 export * from "./analysis";
 export * from "./errors";
+export * from "./learning";
 export * from "./messages";
 export * from "./realtime";
 export * from "./transcript";

@@ -1,9 +1,12 @@
 import type {
   ClassifiedText,
   DeepAnalysis,
+  ExpressionChunk,
   QuickAnalysis,
+  SaveExpressionInput,
 } from "@contextlines/contracts";
-import { useState } from "react";
+import { SaveExpressionInputSchema } from "@contextlines/contracts";
+import { useEffect, useState } from "react";
 
 import type { AnalysisState } from "../../lib/analysis-controller";
 
@@ -25,8 +28,105 @@ function ClassifiedNote({ note }: { note: ClassifiedText }) {
   );
 }
 
-function QuickSection({ quick }: { quick: QuickAnalysis }) {
+function SaveExpressionForm({
+  chunk,
+  quick,
+  canSave,
+  saving,
+  message,
+  error,
+  onSave,
+}: {
+  chunk: ExpressionChunk;
+  quick: QuickAnalysis;
+  canSave: boolean;
+  saving: boolean;
+  message: string | null;
+  error: string | null;
+  onSave: (input: SaveExpressionInput) => Promise<void>;
+}) {
+  const [personalExample, setPersonalExample] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPersonalExample("");
+    setLocalError(null);
+  }, [chunk.text]);
+
+  const submit = async () => {
+    const parsed = SaveExpressionInputSchema.safeParse({
+      expression: chunk.text,
+      source_transcript: quick.transcript,
+      meaning_zh: chunk.meaning_zh.text,
+      intent: quick.intent.text,
+      usage_note: chunk.usage_note.text,
+      personal_example: personalExample,
+      meaning_classification: chunk.meaning_zh.classification,
+      schema_version: 1,
+    });
+    if (!parsed.success) {
+      setLocalError("个人例句必须包含所选表达块，且不能留空。");
+      return;
+    }
+    setLocalError(null);
+    await onSave(parsed.data).catch(() => undefined);
+  };
+
+  return (
+    <div className="save-expression-form">
+      <label htmlFor="personal-example">我的例句</label>
+      <textarea
+        id="personal-example"
+        value={personalExample}
+        maxLength={600}
+        rows={3}
+        placeholder={`写一个包含 “${chunk.text}” 的个人例句`}
+        onChange={(event) => setPersonalExample(event.target.value)}
+      />
+      <p className="form-help">例句用于挖空卡，不会保存完整转写历史。</p>
+      {localError || error ? (
+        <p className="form-error" role="alert">
+          {localError ?? error}
+        </p>
+      ) : null}
+      {message ? (
+        <p className="form-success" role="status">
+          {message}
+        </p>
+      ) : null}
+      <button
+        className="button-secondary save-button"
+        type="button"
+        disabled={!canSave || saving}
+        onClick={() => void submit()}
+      >
+        {!canSave ? "登录后收藏" : saving ? "正在收藏…" : "收藏并创建三张卡"}
+      </button>
+    </div>
+  );
+}
+
+function QuickSection({
+  quick,
+  canSave,
+  saving,
+  message,
+  error,
+  onSave,
+}: {
+  quick: QuickAnalysis;
+  canSave: boolean;
+  saving: boolean;
+  message: string | null;
+  error: string | null;
+  onSave: (input: SaveExpressionInput) => Promise<void>;
+}) {
   const [selectedChunk, setSelectedChunk] = useState<string | null>(null);
+  const chunk = quick.chunks.find((item) => item.text === selectedChunk);
+
+  useEffect(() => {
+    if (selectedChunk && !chunk) setSelectedChunk(null);
+  }, [chunk, selectedChunk]);
 
   return (
     <>
@@ -86,6 +186,17 @@ function QuickSection({ quick }: { quick: QuickAnalysis }) {
             ))}
           </div>
         )}
+        {chunk ? (
+          <SaveExpressionForm
+            chunk={chunk}
+            quick={quick}
+            canSave={canSave}
+            saving={saving}
+            message={message}
+            error={error}
+            onSave={onSave}
+          />
+        ) : null}
       </section>
 
       {quick.scene_inference.length > 0 ? (
@@ -162,9 +273,19 @@ function DeepSection({ deep }: { deep: DeepAnalysis }) {
 export function AnalysisView({
   state,
   onRequestDeep,
+  canSave,
+  saving,
+  saveMessage,
+  saveError,
+  onSaveExpression,
 }: {
   state: AnalysisState;
   onRequestDeep: () => Promise<void>;
+  canSave: boolean;
+  saving: boolean;
+  saveMessage: string | null;
+  saveError: string | null;
+  onSaveExpression: (input: SaveExpressionInput) => Promise<void>;
 }) {
   if (!state.selectedLineId) {
     return (
@@ -199,7 +320,16 @@ export function AnalysisView({
         </p>
       ) : null}
 
-      {state.quick ? <QuickSection quick={state.quick} /> : null}
+      {state.quick ? (
+        <QuickSection
+          quick={state.quick}
+          canSave={canSave}
+          saving={saving}
+          message={saveMessage}
+          error={saveError}
+          onSave={onSaveExpression}
+        />
+      ) : null}
 
       {state.quick && !state.deep ? (
         <button

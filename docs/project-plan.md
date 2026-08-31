@@ -7,9 +7,9 @@
 
 ## Current State
 
-- Phase: Cloud and Review。
-- Working end-to-end: workspace 基线；捕获纵切；点句快速/深入分析、严格 schema、有限上下文、请求去重、后一句单次静默刷新和 Study 响应式界面均已实现并通过自动检查。
-- Incomplete or unverified: 官方 Chrome 151 自动加载 unpacked 扩展受限，真实标签页捕获/浮层仍需安装后复验；OAuth、云端收藏、复习、真实 RLS 和部署前核对未完成。
+- Phase: Quality gate。
+- Working end-to-end: workspace 基线、捕获纵切、Study 分析、Google/Supabase OAuth 代码路径、表达收藏、数据库三卡触发器、FSRS 自评和 Review UI 均已实现；mock 浏览器流程与 PGlite 迁移测试通过。
+- Incomplete or unverified: 官方 Chrome 151 自动加载 unpacked 扩展受限，真实标签页捕获/浮层仍需安装后复验；真实 OAuth、Supabase RLS、OpenAI 和部署前核对需在获准环境验证。
 
 ## Milestones
 
@@ -18,14 +18,14 @@
 | Baseline               | workspace、文档、设计规则、构建和类型检查一致     | complete    | 本地基线门禁与提交                                   |
 | Capture vertical slice | 标签页音频捕获、回放、partial/final 与清理        | implemented | 单测、构建、mock Chrome 渲染；真实安装流程待质量门禁 |
 | Analysis and Study     | 点句快速/深入分析、缓存和 schema 防线             | complete    | 19 项单元/契约测试、构建、320/400/600 Chrome 渲染    |
-| Cloud and Review       | OAuth、RLS、收藏、三卡和 FSRS                     | planned     | 待验证                                               |
+| Cloud and Review       | OAuth、RLS、收藏、三卡和 FSRS                     | implemented | PGlite 约束/RPC 测试；静音 mock 收藏与复习浏览器流程 |
 | Quality gate           | 自动测试、Chrome 流程、100 条评测、打包和独立审查 | planned     | 待验证                                               |
 | Deployment preflight   | 远程配置与验证清单，停止等待授权                  | planned     | 待输出                                               |
 
 ## Active Work
 
-- Now: 实现 Google OAuth、云端收藏、三卡生成和 FSRS 复习。
-- Next: 建立 100 条合成评测和端到端质量门禁。
+- Now: 建立 100 条合成评测、故障/隐私检查、可重复端到端测试与安装包。
+- Next: 独立只读审查并输出部署预检清单。
 - Deferred: 真实 Supabase/Cloudflare/OpenAI 验收与所有远程操作。
 
 ## Blockers And Decisions

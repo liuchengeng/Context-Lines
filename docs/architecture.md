@@ -66,6 +66,8 @@
 | activeTab 动态注入 Shadow DOM        | 最小权限且隔离样式     | 不支持受限 Chrome 页面           |
 | 音频直连 OpenAI                      | Worker 不接触音频      | 上游保留受 OpenAI 项目设置约束   |
 | PGlite 测 SQL                        | 当前机器无 Docker      | 真实 Supabase RLS 留待预发布复验 |
+| PKCE + `launchWebAuthFlow`           | OAuth 留在扩展身份边界 | 稳定扩展 ID 决定固定回调 URL     |
+| 复习只经 `record_review` RPC         | 卡片与事件必须原子更新 | 客户端不能直接插入或更新卡片     |
 
 ## Open Technical Questions
 

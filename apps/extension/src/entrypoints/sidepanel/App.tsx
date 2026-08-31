@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 
 import { AnalysisView } from "./AnalysisView";
+import { ReviewView } from "./ReviewView";
 import { useAnalysis } from "./use-analysis";
+import { useAuth } from "./use-auth";
 import { useCapture } from "./use-capture";
+import { useLearning } from "./use-learning";
 
 type Mode = "flow" | "study" | "review";
 
@@ -16,8 +19,10 @@ const PHASE_LABELS = {
 
 export function App() {
   const [mode, setMode] = useState<Mode>("flow");
+  const auth = useAuth();
   const { state, start, stop, useMocks } = useCapture();
   const analysis = useAnalysis(state.lines, state.source);
+  const learning = useLearning(Boolean(auth.state.user));
   const isBusy = state.phase === "starting" || state.phase === "stopping";
   const isActive = state.phase === "capturing" || state.phase === "starting";
 
@@ -26,6 +31,13 @@ export function App() {
       setMode("flow");
     }
   }, [analysis.state.selectedLineId, mode]);
+
+  useEffect(() => {
+    if (auth.state.user) return;
+    if (isActive) void stop();
+    analysis.reset();
+    if (mode !== "flow") setMode("flow");
+  }, [auth.state.user, isActive, mode]);
 
   return (
     <main className="app-shell">
@@ -36,10 +48,29 @@ export function App() {
           </span>
           <span className="wordmark">ContextLines</span>
         </div>
-        <span className={`status-label status-${state.phase}`}>
-          <span className="status-dot" aria-hidden="true" />
-          {PHASE_LABELS[state.phase]}
-        </span>
+        <div className="header-actions">
+          <span className={`status-label status-${state.phase}`}>
+            <span className="status-dot" aria-hidden="true" />
+            {PHASE_LABELS[state.phase]}
+          </span>
+          <button
+            className="account-button"
+            type="button"
+            disabled={useMocks || auth.state.phase === "signing-in"}
+            title={auth.state.user?.email ?? "使用 Google 登录"}
+            onClick={() =>
+              void (auth.state.user ? auth.signOut() : auth.signIn())
+            }
+          >
+            {useMocks
+              ? "Mock user"
+              : auth.state.phase === "signing-in"
+                ? "登录中…"
+                : auth.state.user
+                  ? "退出"
+                  : "Google 登录"}
+          </button>
+        </div>
       </header>
 
       <nav className="mode-tabs" aria-label="学习模式">
@@ -60,12 +91,20 @@ export function App() {
         >
           Study
         </button>
-        <button className="mode-tab" type="button" disabled>
+        <button
+          className={`mode-tab ${mode === "review" ? "active" : ""}`}
+          type="button"
+          aria-current={mode === "review" ? "page" : undefined}
+          disabled={!auth.state.user}
+          onClick={() => setMode("review")}
+        >
           Review
         </button>
       </nav>
 
-      <div className={`panel-content ${mode === "study" ? "study-panel" : ""}`}>
+      <div
+        className={`panel-content ${mode === "flow" ? "" : "focused-panel"}`}
+      >
         {mode === "flow" ? (
           <>
             <section
@@ -88,10 +127,16 @@ export function App() {
                 音频仅用于实时转写，不由 ContextLines
                 保存。中文分析只会在你点击确认台词后生成。
               </p>
+              {!auth.state.user ? (
+                <div className="auth-notice">
+                  <strong>需要 Google 登录</strong>
+                  <span>Worker 会再次校验允许邮箱，未通过时不会签发凭证。</span>
+                </div>
+              ) : null}
               <button
                 className={isActive ? "button-secondary" : "button-primary"}
                 type="button"
-                disabled={isBusy}
+                disabled={isBusy || !auth.state.user}
                 onClick={() => void (isActive ? stop() : start())}
               >
                 {state.phase === "starting"
@@ -112,6 +157,13 @@ export function App() {
                     ? "可以修复后重试。"
                     : "此页面或当前状态不支持继续。"}
                 </span>
+              </section>
+            ) : null}
+
+            {auth.state.error ? (
+              <section className="problem-panel auth-problem" role="alert">
+                <strong>{auth.state.error}</strong>
+                <span>请检查 Supabase 公共配置或重新完成 Google 登录。</span>
               </section>
             ) : null}
 
@@ -179,10 +231,21 @@ export function App() {
               )}
             </section>
           </>
-        ) : (
+        ) : mode === "study" ? (
           <AnalysisView
             state={analysis.state}
             onRequestDeep={analysis.requestDeep}
+            canSave={Boolean(auth.state.user)}
+            saving={learning.state.saving}
+            saveMessage={learning.state.message}
+            saveError={learning.state.error}
+            onSaveExpression={learning.saveExpression}
+          />
+        ) : (
+          <ReviewView
+            state={learning.state}
+            onGrade={learning.grade}
+            onRefresh={learning.refresh}
           />
         )}
       </div>
