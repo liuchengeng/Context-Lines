@@ -69,7 +69,7 @@ describe("direct provider", () => {
       onopen: (() => void) | null = null;
       onmessage: ((event: MessageEvent<ArrayBuffer>) => void) | null = null;
       onerror: (() => void) | null = null;
-      onclose: (() => void) | null = null;
+      onclose: ((event: CloseEvent) => void) | null = null;
 
       constructor(url: string) {
         openedUrls.push(url);
@@ -87,13 +87,15 @@ describe("direct provider", () => {
                 }),
               }),
             );
-            this.onclose?.();
+            this.onclose?.({ code: 1000, reason: "" } as CloseEvent);
           });
         }
       }
 
       close() {
-        queueMicrotask(() => this.onclose?.());
+        queueMicrotask(() =>
+          this.onclose?.({ code: 1000, reason: "" } as CloseEvent),
+        );
       }
     }
     vi.stubGlobal("WebSocket", MockWebSocket);

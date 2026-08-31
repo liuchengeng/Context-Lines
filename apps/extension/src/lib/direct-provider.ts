@@ -449,6 +449,7 @@ async function transcribeOnce(
       let latestTranscript = "";
       let lastPayload: unknown;
       let settled = false;
+      let socketErrored = false;
       let messageTail: Promise<void> = Promise.resolve();
       const finish = (error?: Error) => {
         if (settled) return;
@@ -511,12 +512,35 @@ async function transcribeOnce(
           });
       };
       socket.onerror = () => {
+        socketErrored = true;
         setTimeout(() => {
-          finish(new Error(formatHandshakeError(handshake.diagnostic)));
+          if (!settled)
+            finish(new Error(formatHandshakeError(handshake.diagnostic)));
         }, 100);
       };
-      socket.onclose = () => {
-        void messageTail.then(() => finish());
+      socket.onclose = (event: CloseEvent) => {
+        void messageTail.then(() => {
+          if (socketErrored) {
+            setTimeout(() => {
+              if (!settled)
+                finish(
+                  new Error(
+                    `${formatHandshakeError(handshake.diagnostic)} WebSocket 关闭码 ${event.code}${event.reason ? `，原因 ${event.reason}` : ""}。`,
+                  ),
+                );
+            }, 120);
+            return;
+          }
+          if (!latestTranscript && lastPayload === undefined) {
+            finish(
+              new Error(
+                `豆包未返回任何数据就关闭了连接（关闭码 ${event.code}${event.reason ? `，原因 ${event.reason}` : ""}；音频峰值 ${audioLevel.peak.toFixed(3)}，RMS ${audioLevel.rms.toFixed(3)}${handshake.diagnostic.logId ? `；LogID ${handshake.diagnostic.logId}` : ""}）。`,
+              ),
+            );
+            return;
+          }
+          finish();
+        });
       };
     });
   } finally {
