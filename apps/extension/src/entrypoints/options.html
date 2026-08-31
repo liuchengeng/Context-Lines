@@ -14,14 +14,22 @@
       </p>
       <form id="form">
         <label
-          >豆包语音 App Key<input
-            id="doubao"
-            name="doubao"
+          >豆包 APP ID<input
+            id="doubao-app-id"
+            name="doubao-app-id"
+            type="text"
+            autocomplete="off"
+            required
+            placeholder="服务接口认证信息左侧的 APP ID" /></label
+        ><label
+          >豆包 Access Token<input
+            id="doubao-access-token"
+            name="doubao-access-token"
             type="password"
             autocomplete="off"
             required
-            placeholder="新版豆包语音控制台 App Key" /></label
-        ><small>需要开通录音文件极速版识别（volc.bigasr.auc_turbo）</small
+            placeholder="服务接口认证信息中间的 Access Token" /></label
+        ><small>使用小时版服务；Secret Key 不需要填写</small
         ><label
           >DeepSeek API Key<input
             id="deepseek"

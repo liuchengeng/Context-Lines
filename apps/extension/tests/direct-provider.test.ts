@@ -119,7 +119,11 @@ describe("direct provider", () => {
     const wav = new Uint8Array(encodeMonoWav(new Float32Array(320), 16_000));
     const answer = await answerWithProviders(
       Buffer.from(wav).toString("base64"),
-      { doubaoApiKey: "doubao-key", deepseekApiKey: "deepseek-key" },
+      {
+        doubaoAppId: "123456789",
+        doubaoAccessToken: "doubao-token",
+        deepseekApiKey: "deepseek-key",
+      },
       "Video",
     );
 
@@ -132,7 +136,25 @@ describe("direct provider", () => {
       expect.objectContaining({
         addRules: [
           expect.objectContaining({
+            action: expect.objectContaining({
+              requestHeaders: expect.arrayContaining([
+                expect.objectContaining({
+                  header: "X-Api-App-Key",
+                  value: "123456789",
+                }),
+                expect.objectContaining({
+                  header: "X-Api-Access-Key",
+                  value: "doubao-token",
+                }),
+                expect.objectContaining({
+                  header: "X-Api-Resource-Id",
+                  value: "volc.bigasr.sauc.duration",
+                }),
+              ]),
+            }),
             condition: expect.objectContaining({
+              urlFilter:
+                "||openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream",
               resourceTypes: ["websocket"],
             }),
           }),

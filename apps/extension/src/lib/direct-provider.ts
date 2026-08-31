@@ -7,13 +7,14 @@ import { z } from "zod";
 const CONFIG_KEY = "providerConfig";
 const DOUBAO_URL =
   "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream";
-const DOUBAO_RESOURCE_ID = "volc.seedasr.sauc.duration";
+const DOUBAO_RESOURCE_ID = "volc.bigasr.sauc.duration";
 const DOUBAO_AUTH_RULE_ID = 9_001;
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const AUDIO_CHUNK_BYTES = 6_400;
 
 export type ProviderConfig = {
-  doubaoApiKey: string;
+  doubaoAppId: string;
+  doubaoAccessToken: string;
   deepseekApiKey: string;
 };
 
@@ -36,10 +37,11 @@ const DoubaoPayloadSchema = z
 export async function loadProviderConfig(): Promise<ProviderConfig | null> {
   const raw = (await chrome.storage.local.get(CONFIG_KEY))[CONFIG_KEY] as
     Partial<ProviderConfig> | undefined;
-  const doubaoApiKey = raw?.doubaoApiKey?.trim() ?? "";
+  const doubaoAppId = raw?.doubaoAppId?.trim() ?? "";
+  const doubaoAccessToken = raw?.doubaoAccessToken?.trim() ?? "";
   const deepseekApiKey = raw?.deepseekApiKey?.trim() ?? "";
-  return doubaoApiKey && deepseekApiKey
-    ? { doubaoApiKey, deepseekApiKey }
+  return doubaoAppId && doubaoAccessToken && deepseekApiKey
+    ? { doubaoAppId, doubaoAccessToken, deepseekApiKey }
     : null;
 }
 
@@ -48,7 +50,8 @@ export async function saveProviderConfig(
 ): Promise<void> {
   await chrome.storage.local.set({
     [CONFIG_KEY]: {
-      doubaoApiKey: config.doubaoApiKey.trim(),
+      doubaoAppId: config.doubaoAppId.trim(),
+      doubaoAccessToken: config.doubaoAccessToken.trim(),
       deepseekApiKey: config.deepseekApiKey.trim(),
     },
   });
@@ -247,7 +250,8 @@ export function extractTranscript(value: unknown): string {
 }
 
 async function installDoubaoHeaders(
-  apiKey: string,
+  appId: string,
+  accessToken: string,
   requestId: string,
 ): Promise<void> {
   await chrome.declarativeNetRequest.updateSessionRules({
@@ -260,9 +264,14 @@ async function installDoubaoHeaders(
           type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
           requestHeaders: [
             {
-              header: "X-Api-Key",
+              header: "X-Api-App-Key",
               operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-              value: apiKey,
+              value: appId,
+            },
+            {
+              header: "X-Api-Access-Key",
+              operation: chrome.declarativeNetRequest.HeaderOperation.SET,
+              value: accessToken,
             },
             {
               header: "X-Api-Resource-Id",
@@ -282,8 +291,7 @@ async function installDoubaoHeaders(
           ],
         },
         condition: {
-          regexFilter:
-            "^wss://openspeech\\.bytedance\\.com/api/v3/sauc/bigmodel_nostream$",
+          urlFilter: "||openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream",
           resourceTypes: [chrome.declarativeNetRequest.ResourceType.WEBSOCKET],
         },
       },
@@ -299,12 +307,13 @@ async function removeDoubaoHeaders(): Promise<void> {
 
 async function transcribeOnce(
   audioBase64: string,
-  apiKey: string,
+  appId: string,
+  accessToken: string,
 ): Promise<string> {
   const pcm = extractPcmFromWav(decodeBase64(audioBase64));
   if (pcm.byteLength === 0) throw new Error("刚才没有可识别的声音。");
   const requestId = crypto.randomUUID();
-  await installDoubaoHeaders(apiKey, requestId);
+  await installDoubaoHeaders(appId, accessToken, requestId);
 
   try {
     return await new Promise<string>((resolve, reject) => {
@@ -360,7 +369,7 @@ async function transcribeOnce(
       socket.onerror = () => {
         finish(
           new Error(
-            "豆包 WebSocket 连接失败，请确认已开通流式语音识别模型 2.0 小时版。",
+            "豆包 WebSocket 连接失败，请确认 APP ID、Access Token 与小时版服务属于同一个应用。",
           ),
         );
       };
@@ -375,10 +384,11 @@ let transcriptionTail: Promise<unknown> = Promise.resolve();
 
 async function transcribe(
   audioBase64: string,
-  apiKey: string,
+  appId: string,
+  accessToken: string,
 ): Promise<string> {
   const task = transcriptionTail.then(() =>
-    transcribeOnce(audioBase64, apiKey),
+    transcribeOnce(audioBase64, appId, accessToken),
   );
   transcriptionTail = task.catch(() => undefined);
   return task;
@@ -389,7 +399,11 @@ export async function answerWithProviders(
   config: ProviderConfig,
   pageTitle?: string,
 ): Promise<QuickAskAnswer> {
-  const transcript = await transcribe(audioBase64, config.doubaoApiKey);
+  const transcript = await transcribe(
+    audioBase64,
+    config.doubaoAppId,
+    config.doubaoAccessToken,
+  );
   const response = await fetch(DEEPSEEK_URL, {
     method: "POST",
     headers: {

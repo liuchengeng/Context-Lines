@@ -4,4 +4,4 @@
 
 首次使用时，设置页把豆包和 DeepSeek 密钥写入 `chrome.storage.local`。网页无法访问扩展存储。密钥不进入构建产物，但本地存储并非操作系统级加密。
 
-`Alt+Q` 将最新 10 秒降采样为 16 kHz WAV。后台取出其中的单声道 PCM，通过单向流式 WebSocket 调用豆包流式语音识别模型 2.0 小时版，再调用 DeepSeek V4 Flash JSON 输出。豆包 WebSocket 握手所需的临时请求头由仅匹配该端点的 Chrome session rule 注入，并在连接结束后立即移除。结果通过 `chrome.scripting` 显示在当前全屏元素内，不暂停、不抢焦点。
+`Alt+Q` 将最新 10 秒降采样为 16 kHz WAV。后台取出其中的单声道 PCM，通过单向流式 WebSocket 调用旧版控制台的豆包流式语音识别小时版，再调用 DeepSeek V4 Flash JSON 输出。豆包 WebSocket 握手所需的 APP ID 和 Access Token 由仅匹配该端点的 Chrome session rule 临时注入，并在连接结束后立即移除。结果通过 `chrome.scripting` 显示在当前全屏元素内，不暂停、不抢焦点。
