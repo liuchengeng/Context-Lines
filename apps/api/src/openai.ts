@@ -8,7 +8,7 @@ const OpenAIClientSecretSchema = z.object({
   expires_at: z.number().int().positive(),
 });
 
-async function safetyIdentifier(userId: string): Promise<string> {
+export async function safetyIdentifier(userId: string): Promise<string> {
   const encoded = new TextEncoder().encode(userId);
   const hash = await crypto.subtle.digest("SHA-256", encoded);
   return [...new Uint8Array(hash)]

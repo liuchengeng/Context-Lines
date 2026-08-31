@@ -1,11 +1,14 @@
 import {
   CONTRACT_VERSION,
+  DeepAnalysisRequestSchema,
   HealthResponseSchema,
+  QuickAnalysisRequestSchema,
   WorkerErrorSchema,
 } from "@contextlines/contracts";
 import { Hono } from "hono";
 
 import { requireAllowedUser } from "./auth";
+import { OpenAIAnalysisProvider } from "./analysis-provider";
 import { HttpError, type AppBindings, requestIdOf } from "./http";
 import { createRealtimeClientSecret } from "./openai";
 
@@ -96,6 +99,60 @@ app.post("/v1/realtime/client-secret", async (context) => {
     requestIdOf(context),
   );
   return context.json(payload);
+});
+
+app.post("/v1/analysis/quick", async (context) => {
+  const rawBody: unknown = await context.req.json().catch(() => {
+    throw new HttpError(
+      400,
+      "INVALID_JSON",
+      "请求正文必须是有效 JSON。",
+      false,
+    );
+  });
+  const parsed = QuickAnalysisRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    throw new HttpError(
+      422,
+      "INVALID_REQUEST",
+      "分析上下文不符合数据契约。",
+      false,
+    );
+  }
+  const provider = new OpenAIAnalysisProvider(
+    context.env,
+    context.get("user").id,
+    requestIdOf(context),
+  );
+  return context.json(await provider.quick(parsed.data.context));
+});
+
+app.post("/v1/analysis/deep", async (context) => {
+  const rawBody: unknown = await context.req.json().catch(() => {
+    throw new HttpError(
+      400,
+      "INVALID_JSON",
+      "请求正文必须是有效 JSON。",
+      false,
+    );
+  });
+  const parsed = DeepAnalysisRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    throw new HttpError(
+      422,
+      "INVALID_REQUEST",
+      "深入分析请求不符合数据契约。",
+      false,
+    );
+  }
+  const provider = new OpenAIAnalysisProvider(
+    context.env,
+    context.get("user").id,
+    requestIdOf(context),
+  );
+  return context.json(
+    await provider.deep(parsed.data.context, parsed.data.quick),
+  );
 });
 
 export default app;
