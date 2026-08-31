@@ -125,20 +125,25 @@ export async function normalizeBinaryFrame(
   return data instanceof Blob ? data.arrayBuffer() : data;
 }
 
+function frameByteLength(
+  data: string | ArrayBuffer | ArrayBufferView | Blob,
+): number {
+  if (typeof data === "string")
+    return new TextEncoder().encode(data).byteLength;
+  return data instanceof Blob ? data.size : data.byteLength;
+}
+
 async function connectDoubao(clientSocket: WebSocket, env: Env): Promise<void> {
   let upstream: WebSocket | null = null;
   let clientClosed = false;
   let queuedBytes = 0;
-  const queued: Array<string | ArrayBuffer> = [];
+  const queued: Array<string | ArrayBuffer | ArrayBufferView> = [];
+  let clientMessageTail: Promise<void> = Promise.resolve();
   const controller = new AbortController();
 
   clientSocket.addEventListener("message", (event) => {
-    const data = event.data;
-    if (upstream?.readyState === 1) {
-      upstream.send(data);
-      return;
-    }
-    const size = typeof data === "string" ? data.length : data.byteLength;
+    const data = event.data as string | ArrayBuffer | ArrayBufferView | Blob;
+    const size = frameByteLength(data);
     queuedBytes += size;
     if (queuedBytes > MAX_QUEUED_BYTES) {
       sendRelayError(clientSocket, "待转发的音频过大，请缩短后重试。");
@@ -146,7 +151,23 @@ async function connectDoubao(clientSocket: WebSocket, env: Env): Promise<void> {
       controller.abort();
       return;
     }
-    queued.push(data);
+    clientMessageTail = clientMessageTail
+      .then(async () => {
+        const frame =
+          typeof data === "string" ? data : await normalizeBinaryFrame(data);
+        if (upstream?.readyState === 1) {
+          upstream.send(frame);
+          queuedBytes -= size;
+        } else {
+          queued.push(frame);
+        }
+      })
+      .catch(() => {
+        sendRelayError(clientSocket, "扩展音频二进制转换失败，请重试。");
+        closeSocket(clientSocket);
+        controller.abort();
+        if (upstream) closeSocket(upstream);
+      });
   });
   clientSocket.addEventListener("close", () => {
     clientClosed = true;
@@ -226,8 +247,10 @@ async function connectDoubao(clientSocket: WebSocket, env: Env): Promise<void> {
       closeSocket(upstream, 1000, "client closed");
       return;
     }
+    await clientMessageTail;
     for (const message of queued) upstream.send(message);
     queued.length = 0;
+    queuedBytes = 0;
   } catch (error) {
     if (clientClosed) return;
     const message =
