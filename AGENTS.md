@@ -12,10 +12,10 @@
 ## Project-Specific Rules
 
 - Use pnpm workspace commands from the repository root.
-- Only the user-triggered recent WAV clip may be sent to Doubao; only its transcript and page title may be sent to DeepSeek.
-- Provider keys may persist only in `chrome.storage.local`; never put them in source, build-time environment values, logs, fixtures, or webpages.
+- Only the user-triggered recent WAV clip may be relayed to Doubao; only its transcript and page title may be sent to DeepSeek.
+- Provider keys may persist only as Cloudflare Worker Secrets. Chrome may store only the Worker URL and random relay token. Never put secrets in source, build-time values, logs, fixtures, or webpages.
 - Do not add persistent session, audio, transcript-history, or browsing-history storage.
-- `apps/extension` targets desktop Chrome 116+ only. Host permissions are limited to the two configured provider API origins.
+- `apps/extension` targets desktop Chrome 116+ only. Production host permissions are limited to `*.workers.dev`.
 - Treat `apps/extension/.output`, `dist`, coverage, Playwright output, `.wrangler`, and local environment files as generated or local artifacts.
 - Git remotes, pushes, deployments, and releases require separate user authorization.
 

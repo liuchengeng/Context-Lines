@@ -1,8 +1,8 @@
 # ContextLines Quick Ask
 
-一个个人使用的 Chrome 116+ 扩展：在本机内存中保留当前视频最近约 10 秒声音，按 `Alt+Q` 后才调用豆包流式语音识别小时版与 DeepSeek 中文解释。它不会暂停视频或退出全屏。
+一个个人使用的 Chrome 116+ 扩展：在内存中保留当前视频最近约 10 秒声音，按 `Alt+Q` 后才经个人 Cloudflare Worker 调用豆包流式语音识别小时版与 DeepSeek 中文解释。它不会暂停视频、退出全屏或保存音频与转写历史。
 
-## 使用
+## 本地开发
 
 ```powershell
 cd D:\subtitle
@@ -11,17 +11,47 @@ corepack pnpm dev
 
 保持终端运行，在 `chrome://extensions` 开启开发者模式，加载 `D:\subtitle\apps\extension\.output\chrome-mv3-dev`。
 
-1. 第一次点击扩展图标会打开设置页。
-2. 填写旧版豆包语音控制台同一应用下的 APP ID、Access Token，以及 DeepSeek API Key，点击保存。Secret Key 不需要填写。
-3. 回到视频，再点击扩展图标；绿色 `ON` 表示开始缓存最近音频。
-4. 进入全屏，按 `Alt+Q`；解释显示在右上角。
-5. 点击 `×` 或再次按 `Alt+Q` 关闭；再次点击扩展图标停止监听。
+## 首次部署中转
 
-豆包账号需要开通流式语音识别大模型小时版资源 `volc.bigasr.sauc.duration`。这里的“小时版”按实际发送的音频时长计量，不是每次调用扣一整小时。如果快捷键无效，在 `chrome://extensions/shortcuts` 手动设置。
+部署会创建远程 Cloudflare Worker，必须由项目所有者明确执行。先登录：
 
-## 隐私与密钥
+```powershell
+cd D:\subtitle
+corepack pnpm --filter @contextlines/relay exec wrangler login
+```
 
-两个密钥保存在 `chrome.storage.local`，不会交给网页，也不会写入仓库；扩展后台会直接请求豆包和 DeepSeek。Chrome 本地扩展存储不是操作系统级加密保险库。卸载扩展会移除设置。
+生成一个随机连接口令，只显示一次并妥善保存：
+
+```powershell
+[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).TrimEnd('=').Replace('+','-').Replace('/','_')
+```
+
+依次写入四个 Worker Secrets。命令会在本机提示输入值，不要把值写进命令或聊天：
+
+```powershell
+corepack pnpm --filter @contextlines/relay exec wrangler secret put DOUBAO_APP_ID
+corepack pnpm --filter @contextlines/relay exec wrangler secret put DOUBAO_ACCESS_TOKEN
+corepack pnpm --filter @contextlines/relay exec wrangler secret put DEEPSEEK_API_KEY
+corepack pnpm --filter @contextlines/relay exec wrangler secret put RELAY_TOKEN
+```
+
+其中 `RELAY_TOKEN` 填刚生成的随机口令。豆包使用流式语音识别大模型小时版的 APP ID 与 Access Token，Secret Key 不需要。
+
+最后部署：
+
+```powershell
+corepack pnpm --filter @contextlines/relay exec wrangler deploy
+```
+
+部署输出会给出 `https://...workers.dev` 地址。重新加载扩展，点击图标，在设置页只填 Worker 地址和随机连接口令。检查成功后回到视频，再点击扩展图标；绿色 `ON` 表示开始缓存最近音频。播放几秒后按 `Alt+Q` 查看解释。
+
+## 隐私边界
+
+- Chrome 只保存 Worker 地址与随机连接口令。
+- 豆包和 DeepSeek 密钥只存在于 Cloudflare Worker Secrets。
+- 只有用户按 `Alt+Q` 后，最近约 10 秒 WAV 才经 Worker 转发给豆包。
+- 只有豆包转写、最多 160 字页面标题会发送给 DeepSeek。
+- Worker 不写数据库，不记录原始音频或完整转写历史。
 
 ## 检查
 

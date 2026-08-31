@@ -8,16 +8,15 @@ export default defineConfig({
     minimum_chrome_version: "116",
     permissions: [
       "activeTab",
-      "declarativeNetRequestWithHostAccess",
       "offscreen",
       "scripting",
       "storage",
       "tabCapture",
-      "webRequest",
     ],
     host_permissions: [
-      "https://openspeech.bytedance.com/*",
-      "https://api.deepseek.com/*",
+      "https://*.workers.dev/*",
+      "http://localhost/*",
+      "http://127.0.0.1/*",
     ],
     action: { default_title: "点击开始监听最近 10 秒" },
     commands: {
@@ -28,7 +27,7 @@ export default defineConfig({
     },
     content_security_policy: {
       extension_pages:
-        "script-src 'self'; object-src 'self'; connect-src 'self' wss://openspeech.bytedance.com https://api.deepseek.com",
+        "script-src 'self'; object-src 'self'; connect-src 'self' https://*.workers.dev wss://*.workers.dev http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*",
     },
   },
 });

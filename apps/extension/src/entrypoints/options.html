@@ -8,43 +8,35 @@
   <body>
     <main>
       <div class="brand">Q</div>
-      <h1>连接模型</h1>
+      <h1>连接中转服务</h1>
       <p class="intro">
-        只需设置一次。密钥保存在这台电脑的 Chrome 扩展存储中，不会发送给网页。
+        扩展只连接你自己的 Cloudflare Worker。豆包和 DeepSeek 密钥保存在
+        Cloudflare Secrets，不再保存在 Chrome。
       </p>
       <form id="form">
         <label
-          >豆包 APP ID<input
-            id="doubao-app-id"
-            name="doubao-app-id"
-            type="text"
+          >Worker 地址<input
+            id="relay-url"
+            name="relay-url"
+            type="url"
             autocomplete="off"
             required
-            placeholder="服务接口认证信息左侧的 APP ID" /></label
+            placeholder="https://contextlines-relay.你的名称.workers.dev" /></label
         ><label
-          >豆包 Access Token<input
-            id="doubao-access-token"
-            name="doubao-access-token"
+          >连接口令<input
+            id="relay-token"
+            name="relay-token"
             type="password"
             autocomplete="off"
             required
-            placeholder="服务接口认证信息中间的 Access Token" /></label
-        ><small>使用小时版服务；Secret Key 不需要填写</small
-        ><label
-          >DeepSeek API Key<input
-            id="deepseek"
-            name="deepseek"
-            type="password"
-            autocomplete="off"
-            required
-            placeholder="sk-..." /></label
-        ><button type="submit">保存设置</button>
+            placeholder="部署时生成的随机口令" /></label
+        ><small>这里只填 Worker 地址和连接口令，不要填写模型密钥。</small
+        ><button type="submit">检查并保存</button>
         <p id="status" role="status"></p>
       </form>
       <p class="privacy">
-        密钥会持久保存在
-        <code>chrome.storage.local</code>，并仅由扩展后台直接请求豆包和
-        DeepSeek。卸载扩展会删除这些设置。
+        Chrome 只保存 Worker 地址与连接口令。最近 10 秒音频仅在你按
+        <code>Alt+Q</code> 后，经 Worker 转发给豆包；识别文本再发给 DeepSeek。
       </p>
     </main>
     <script type="module" src="./options/main.ts"></script>

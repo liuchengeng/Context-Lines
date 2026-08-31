@@ -2,51 +2,69 @@ import {
   QuickAskAnswerSchema,
   type QuickAskAnswer,
 } from "@contextlines/contracts";
-import { z } from "zod";
 
 const CONFIG_KEY = "providerConfig";
-const DOUBAO_URL =
-  "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream";
-const DOUBAO_RESOURCE_ID = "volc.bigasr.sauc.duration";
-const DOUBAO_AUTH_RULE_ID = 9_001;
-const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const AUDIO_CHUNK_BYTES = 6_400;
-const DOUBAO_URL_FILTER = {
-  urls: ["wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream"],
-  types: ["websocket" as const],
-};
+const RELAY_PROTOCOL = "contextlines";
 
 export type ProviderConfig = {
-  doubaoAppId: string;
-  doubaoAccessToken: string;
-  deepseekApiKey: string;
+  relayUrl: string;
+  relayToken: string;
 };
 
-const DeepSeekResponseSchema = z.object({
-  choices: z
-    .array(z.object({ message: z.object({ content: z.string().nullable() }) }))
-    .min(1),
-});
+export function normalizeRelayBaseUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new Error("Worker 地址格式不正确。");
+  }
+  const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (url.protocol !== "https:" && !(isLocal && url.protocol === "http:")) {
+    throw new Error("Worker 地址必须使用 HTTPS。");
+  }
+  if (url.username || url.password || url.search || url.hash) {
+    throw new Error("Worker 地址不能包含账号、查询参数或锚点。");
+  }
+  url.pathname = url.pathname.replace(/\/+$/, "");
+  return url.toString().replace(/\/$/, "");
+}
 
-const DoubaoPayloadSchema = z
-  .object({
-    code: z.number().optional(),
-    message: z.string().optional(),
-    payload_msg: z.unknown().optional(),
-    result: z.unknown().optional(),
-    text: z.string().optional(),
-  })
-  .passthrough();
+export function relayWebSocketUrl(baseUrl: string): string {
+  const url = new URL(normalizeRelayBaseUrl(baseUrl));
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.pathname = `${url.pathname}/v1/doubao`.replace(/\/+/g, "/");
+  return url.toString();
+}
+
+function relayHttpUrl(baseUrl: string, path: string): string {
+  const url = new URL(normalizeRelayBaseUrl(baseUrl));
+  url.pathname = `${url.pathname}${path}`.replace(/\/+/g, "/");
+  return url.toString();
+}
 
 export async function loadProviderConfig(): Promise<ProviderConfig | null> {
   const raw = (await chrome.storage.local.get(CONFIG_KEY))[CONFIG_KEY] as
-    Partial<ProviderConfig> | undefined;
-  const doubaoAppId = raw?.doubaoAppId?.trim() ?? "";
-  const doubaoAccessToken = raw?.doubaoAccessToken?.trim() ?? "";
-  const deepseekApiKey = raw?.deepseekApiKey?.trim() ?? "";
-  return doubaoAppId && doubaoAccessToken && deepseekApiKey
-    ? { doubaoAppId, doubaoAccessToken, deepseekApiKey }
-    : null;
+    Record<string, unknown> | undefined;
+  const relayUrl = typeof raw?.relayUrl === "string" ? raw.relayUrl.trim() : "";
+  const relayToken =
+    typeof raw?.relayToken === "string" ? raw.relayToken.trim() : "";
+  if (!relayUrl || !relayToken) {
+    if (
+      raw &&
+      ("doubaoAppId" in raw ||
+        "doubaoAccessToken" in raw ||
+        "deepseekApiKey" in raw)
+    ) {
+      await chrome.storage.local.remove(CONFIG_KEY);
+    }
+    return null;
+  }
+  try {
+    return { relayUrl: normalizeRelayBaseUrl(relayUrl), relayToken };
+  } catch {
+    return null;
+  }
 }
 
 export async function saveProviderConfig(
@@ -54,9 +72,8 @@ export async function saveProviderConfig(
 ): Promise<void> {
   await chrome.storage.local.set({
     [CONFIG_KEY]: {
-      doubaoAppId: config.doubaoAppId.trim(),
-      doubaoAccessToken: config.doubaoAccessToken.trim(),
-      deepseekApiKey: config.deepseekApiKey.trim(),
+      relayUrl: normalizeRelayBaseUrl(config.relayUrl),
+      relayToken: config.relayToken.trim(),
     },
   });
 }
@@ -113,24 +130,14 @@ function makePacket(
   serialization: number,
   compression: number,
   payload: Uint8Array,
-  sequence?: number,
 ): ArrayBuffer {
-  const hasSequence = (flags & 0b0001) !== 0;
-  const packet = new Uint8Array(
-    4 + (hasSequence ? 4 : 0) + 4 + payload.byteLength,
-  );
+  const packet = new Uint8Array(8 + payload.byteLength);
   packet[0] = 0x11;
   packet[1] = (messageType << 4) | flags;
   packet[2] = (serialization << 4) | compression;
   packet[3] = 0;
-  const view = new DataView(packet.buffer);
-  let offset = 4;
-  if (hasSequence) {
-    view.setInt32(offset, sequence ?? 0, false);
-    offset += 4;
-  }
-  view.setUint32(offset, payload.byteLength, false);
-  packet.set(payload, offset + 4);
+  new DataView(packet.buffer).setUint32(4, payload.byteLength, false);
+  packet.set(payload, 8);
   return packet.buffer;
 }
 
@@ -235,12 +242,11 @@ function nestedRecord(value: unknown, key: string): unknown {
 }
 
 export function extractTranscript(value: unknown): string {
-  const parsed = DoubaoPayloadSchema.safeParse(value);
-  if (!parsed.success) return "";
-  const root = parsed.data;
+  if (!value || typeof value !== "object") return "";
+  const root = value as Record<string, unknown>;
   if (typeof root.code === "number" && root.code !== 0) {
     throw new Error(
-      `豆包语音识别失败（${root.code}）：${root.message ?? "请检查服务权限"}`,
+      `豆包语音识别失败（${root.code}）：${typeof root.message === "string" ? root.message : "请检查服务权限"}`,
     );
   }
   const payload = root.payload_msg ?? root;
@@ -258,139 +264,6 @@ export function extractTranscript(value: unknown): string {
   ).trim();
 }
 
-export async function installDoubaoHeaders(
-  appId: string,
-  accessToken: string,
-  connectId: string,
-): Promise<void> {
-  await chrome.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: [DOUBAO_AUTH_RULE_ID],
-    addRules: [
-      {
-        id: DOUBAO_AUTH_RULE_ID,
-        priority: 1,
-        action: {
-          type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
-          requestHeaders: [
-            {
-              header: "X-Api-App-Key",
-              operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-              value: appId,
-            },
-            {
-              header: "X-Api-Access-Key",
-              operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-              value: accessToken,
-            },
-            {
-              header: "X-Api-Resource-Id",
-              operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-              value: DOUBAO_RESOURCE_ID,
-            },
-            {
-              header: "X-Api-Connect-Id",
-              operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-              value: connectId,
-            },
-          ],
-        },
-        condition: {
-          urlFilter: "||openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream",
-          resourceTypes: [chrome.declarativeNetRequest.ResourceType.WEBSOCKET],
-        },
-      },
-    ],
-  });
-}
-
-export async function removeDoubaoHeaders(): Promise<void> {
-  await chrome.declarativeNetRequest
-    .updateSessionRules({ removeRuleIds: [DOUBAO_AUTH_RULE_ID] })
-    .catch(() => undefined);
-}
-
-type HandshakeDiagnostic = {
-  statusCode?: number;
-  apiStatus?: string;
-  apiMessage?: string;
-  logId?: string;
-  networkError?: string;
-  authHeadersSeen: boolean;
-};
-
-function observeDoubaoHandshake(): {
-  diagnostic: HandshakeDiagnostic;
-  cleanup: () => void;
-} {
-  const diagnostic: HandshakeDiagnostic = { authHeadersSeen: false };
-  const webRequest = chrome.webRequest;
-  if (
-    !webRequest?.onSendHeaders ||
-    !webRequest.onHeadersReceived ||
-    !webRequest.onErrorOccurred
-  ) {
-    return { diagnostic, cleanup: () => undefined };
-  }
-  const sent = (details: chrome.webRequest.OnSendHeadersDetails) => {
-    const names = new Set(
-      (details.requestHeaders ?? []).map((header) => header.name.toLowerCase()),
-    );
-    diagnostic.authHeadersSeen =
-      names.has("x-api-app-key") &&
-      names.has("x-api-access-key") &&
-      names.has("x-api-resource-id") &&
-      names.has("x-api-connect-id");
-  };
-  const received = (details: chrome.webRequest.OnHeadersReceivedDetails) => {
-    diagnostic.statusCode = details.statusCode;
-    const headers = new Map(
-      (details.responseHeaders ?? []).map((header) => [
-        header.name.toLowerCase(),
-        header.value ?? "",
-      ]),
-    );
-    const apiStatus = headers.get("x-api-status-code");
-    const apiMessage = headers.get("x-api-message");
-    const logId = headers.get("x-tt-logid");
-    if (apiStatus) diagnostic.apiStatus = apiStatus;
-    if (apiMessage) diagnostic.apiMessage = apiMessage;
-    if (logId) diagnostic.logId = logId;
-    return undefined;
-  };
-  const failed = (details: chrome.webRequest.OnErrorOccurredDetails) => {
-    diagnostic.networkError = details.error;
-  };
-  webRequest.onSendHeaders.addListener(sent, DOUBAO_URL_FILTER, [
-    "requestHeaders",
-    "extraHeaders",
-  ]);
-  webRequest.onHeadersReceived.addListener(received, DOUBAO_URL_FILTER, [
-    "responseHeaders",
-    "extraHeaders",
-  ]);
-  webRequest.onErrorOccurred.addListener(failed, DOUBAO_URL_FILTER);
-  return {
-    diagnostic,
-    cleanup: () => {
-      webRequest.onSendHeaders.removeListener(sent);
-      webRequest.onHeadersReceived.removeListener(received);
-      webRequest.onErrorOccurred.removeListener(failed);
-    },
-  };
-}
-
-function formatHandshakeError(diagnostic: HandshakeDiagnostic): string {
-  const parts = ["豆包 WebSocket 握手失败"];
-  if (diagnostic.statusCode) parts.push(`HTTP ${diagnostic.statusCode}`);
-  if (diagnostic.apiStatus) parts.push(`状态 ${diagnostic.apiStatus}`);
-  if (diagnostic.apiMessage) parts.push(diagnostic.apiMessage);
-  if (!diagnostic.authHeadersSeen) parts.push("Chrome 最终请求中没有鉴权头");
-  if (diagnostic.networkError)
-    parts.push(`网络错误 ${diagnostic.networkError}`);
-  if (diagnostic.logId) parts.push(`LogID ${diagnostic.logId}`);
-  return `${parts.join("；")}。`;
-}
-
 function measurePcmLevel(pcm: Uint8Array<ArrayBuffer>): {
   peak: number;
   rms: number;
@@ -401,8 +274,7 @@ function measurePcmLevel(pcm: Uint8Array<ArrayBuffer>): {
   const samples = Math.floor(pcm.byteLength / 2);
   for (let offset = 0; offset + 1 < pcm.byteLength; offset += 2) {
     const value = view.getInt16(offset, true) / 0x8000;
-    const absolute = Math.abs(value);
-    if (absolute > peak) peak = absolute;
+    peak = Math.max(peak, Math.abs(value));
     squares += value * value;
   }
   return { peak, rms: samples ? Math.sqrt(squares / samples) : 0 };
@@ -419,28 +291,29 @@ function summarizeDoubaoPayload(value: unknown): string {
     payload.result && typeof payload.result === "object"
       ? (payload.result as Record<string, unknown>)
       : undefined;
-  const audioInfo =
-    payload.audio_info && typeof payload.audio_info === "object"
-      ? (payload.audio_info as Record<string, unknown>)
-      : undefined;
   return JSON.stringify({
     code: root.code,
     message: root.message,
-    duration: audioInfo?.duration,
     text: result?.text,
-    utterances: Array.isArray(result?.utterances)
-      ? result.utterances.length
-      : undefined,
     payload_keys: Object.keys(payload),
     result_keys: result ? Object.keys(result) : [],
-  }).slice(0, 500);
+  }).slice(0, 400);
+}
+
+function relayControlError(value: string): Error | null {
+  try {
+    const data = JSON.parse(value) as Record<string, unknown>;
+    return data.type === "relay_error" && typeof data.message === "string"
+      ? new Error(data.message)
+      : null;
+  } catch {
+    return new Error("中转服务返回了无法识别的消息。");
+  }
 }
 
 async function transcribeOnce(
   audioBase64: string,
-  appId: string,
-  accessToken: string,
-  options?: { headersReady?: boolean; connectId?: string },
+  config: ProviderConfig,
 ): Promise<string> {
   const pcm = extractPcmFromWav(decodeBase64(audioBase64));
   if (pcm.byteLength === 0) throw new Error("刚才没有可识别的声音。");
@@ -450,128 +323,108 @@ async function transcribeOnce(
       `扩展捕获到的标签页音频接近静音（峰值 ${audioLevel.peak.toFixed(5)}）。请确认视频正在播放且标签页没有静音。`,
     );
   }
-  const requestId = options?.connectId ?? crypto.randomUUID();
-  if (!options?.headersReady)
-    await installDoubaoHeaders(appId, accessToken, requestId);
-  const handshake = observeDoubaoHandshake();
 
-  try {
-    return await new Promise<string>((resolve, reject) => {
-      const socket = new WebSocket(DOUBAO_URL);
-      socket.binaryType = "arraybuffer";
-      let latestTranscript = "";
-      let lastPayload: unknown;
-      let settled = false;
-      let socketErrored = false;
-      let messageTail: Promise<void> = Promise.resolve();
-      const finish = (error?: Error) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        if (error) reject(error);
-        else if (latestTranscript) resolve(latestTranscript);
-        else
-          reject(
-            new Error(
-              `豆包返回了空文本（音频峰值 ${audioLevel.peak.toFixed(3)}，RMS ${audioLevel.rms.toFixed(3)}；响应 ${summarizeDoubaoPayload(lastPayload)}）。`,
-            ),
-          );
-      };
-      const timeout = setTimeout(() => {
+  return new Promise<string>((resolve, reject) => {
+    const socket = new WebSocket(relayWebSocketUrl(config.relayUrl), [
+      RELAY_PROTOCOL,
+      config.relayToken,
+    ]);
+    socket.binaryType = "arraybuffer";
+    let latestTranscript = "";
+    let lastPayload: unknown;
+    let settled = false;
+    let messageTail: Promise<void> = Promise.resolve();
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (error) reject(error);
+      else if (latestTranscript) resolve(latestTranscript);
+      else
+        reject(
+          new Error(
+            `豆包返回了空文本（音频峰值 ${audioLevel.peak.toFixed(3)}，RMS ${audioLevel.rms.toFixed(3)}；响应 ${summarizeDoubaoPayload(lastPayload)}）。`,
+          ),
+        );
+    };
+    const timeout = setTimeout(() => {
+      socket.close();
+      finish(new Error("豆包语音识别超时，请稍后重试。"));
+    }, 20_000);
+
+    socket.onopen = () => {
+      void (async () => {
+        socket.send(await makeDoubaoRequestPacket());
+        const count = Math.ceil(pcm.byteLength / AUDIO_CHUNK_BYTES);
+        for (let index = 0; index < count; index += 1) {
+          const start = index * AUDIO_CHUNK_BYTES;
+          const chunk = pcm.slice(start, start + AUDIO_CHUNK_BYTES);
+          socket.send(await makeDoubaoAudioPacket(chunk, index === count - 1));
+        }
+      })().catch((error: unknown) => {
         socket.close();
-        finish(new Error("豆包语音识别超时，请稍后重试。"));
-      }, 20_000);
-
-      socket.onopen = () => {
-        void (async () => {
-          socket.send(await makeDoubaoRequestPacket());
-          const count = Math.ceil(pcm.byteLength / AUDIO_CHUNK_BYTES);
-          for (let index = 0; index < count; index += 1) {
-            const start = index * AUDIO_CHUNK_BYTES;
-            const chunk = pcm.slice(start, start + AUDIO_CHUNK_BYTES);
-            socket.send(
-              await makeDoubaoAudioPacket(chunk, index === count - 1),
-            );
+        finish(
+          error instanceof Error ? error : new Error("豆包请求数据生成失败。"),
+        );
+      });
+    };
+    socket.onmessage = (event: MessageEvent<ArrayBuffer | string>) => {
+      if (typeof event.data === "string") {
+        const error = relayControlError(event.data);
+        if (error) {
+          socket.close();
+          finish(error);
+        }
+        return;
+      }
+      const packet = event.data;
+      messageTail = messageTail
+        .then(async () => {
+          const payload = await parseDoubaoPacket(packet);
+          if (payload !== null) lastPayload = payload;
+          const transcript = extractTranscript(payload);
+          if (transcript) latestTranscript = transcript;
+          if (nestedRecord(payload, "is_last_package") === true) {
+            socket.close();
+            finish();
           }
-        })().catch((error: unknown) => {
+        })
+        .catch((error: unknown) => {
           socket.close();
           finish(
             error instanceof Error
               ? error
-              : new Error("豆包请求数据生成失败。"),
+              : new Error("豆包语音识别返回异常。"),
           );
         });
-      };
-      socket.onmessage = (event: MessageEvent<ArrayBuffer>) => {
-        messageTail = messageTail
-          .then(async () => {
-            const payload = await parseDoubaoPacket(event.data);
-            if (payload !== null) lastPayload = payload;
-            const transcript = extractTranscript(payload);
-            if (transcript) latestTranscript = transcript;
-            const isLast = nestedRecord(payload, "is_last_package") === true;
-            if (isLast) {
-              socket.close();
-              finish();
-            }
-          })
-          .catch((error: unknown) => {
-            socket.close();
-            finish(
-              error instanceof Error
-                ? error
-                : new Error("豆包语音识别返回异常。"),
-            );
-          });
-      };
-      socket.onerror = () => {
-        socketErrored = true;
-        setTimeout(() => {
-          if (!settled)
-            finish(new Error(formatHandshakeError(handshake.diagnostic)));
-        }, 100);
-      };
-      socket.onclose = (event: CloseEvent) => {
-        void messageTail.then(() => {
-          if (socketErrored) {
-            setTimeout(() => {
-              if (!settled)
-                finish(
-                  new Error(
-                    `${formatHandshakeError(handshake.diagnostic)} WebSocket 关闭码 ${event.code}${event.reason ? `，原因 ${event.reason}` : ""}。`,
-                  ),
-                );
-            }, 120);
-            return;
-          }
-          if (!latestTranscript && lastPayload === undefined) {
-            finish(
-              new Error(
-                `豆包未返回任何数据就关闭了连接（关闭码 ${event.code}${event.reason ? `，原因 ${event.reason}` : ""}；音频峰值 ${audioLevel.peak.toFixed(3)}，RMS ${audioLevel.rms.toFixed(3)}${handshake.diagnostic.logId ? `；LogID ${handshake.diagnostic.logId}` : ""}）。`,
-              ),
-            );
-            return;
-          }
-          finish();
-        });
-      };
-    });
-  } finally {
-    handshake.cleanup();
-    if (!options?.headersReady) await removeDoubaoHeaders();
-  }
+    };
+    socket.onerror = () => {
+      finish(
+        new Error("无法连接 Cloudflare 中转，请检查 Worker 地址和连接口令。"),
+      );
+    };
+    socket.onclose = (event: CloseEvent) => {
+      void messageTail.then(() => {
+        if (!settled && !latestTranscript && lastPayload === undefined) {
+          finish(
+            new Error(
+              `中转连接已关闭（代码 ${event.code}${event.reason ? `，${event.reason}` : ""}）。`,
+            ),
+          );
+        } else finish();
+      });
+    };
+  });
 }
 
 let transcriptionTail: Promise<unknown> = Promise.resolve();
 
 async function transcribe(
   audioBase64: string,
-  appId: string,
-  accessToken: string,
-  options?: { headersReady?: boolean; connectId?: string },
+  config: ProviderConfig,
 ): Promise<string> {
   const task = transcriptionTail.then(() =>
-    transcribeOnce(audioBase64, appId, accessToken, options),
+    transcribeOnce(audioBase64, config),
   );
   transcriptionTail = task.catch(() => undefined);
   return task;
@@ -581,58 +434,28 @@ export async function answerWithProviders(
   audioBase64: string,
   config: ProviderConfig,
   pageTitle?: string,
-  options?: { headersReady?: boolean; connectId?: string },
 ): Promise<QuickAskAnswer> {
-  const transcript = await transcribe(
-    audioBase64,
-    config.doubaoAppId,
-    config.doubaoAccessToken,
-    options,
-  );
-  const response = await fetch(DEEPSEEK_URL, {
+  const transcript = await transcribe(audioBase64, config);
+  const response = await fetch(relayHttpUrl(config.relayUrl, "/v1/explain"), {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${config.deepseekApiKey}`,
+      Authorization: `Bearer ${config.relayToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: "deepseek-v4-flash",
-      thinking: { type: "disabled" },
-      response_format: { type: "json_object" },
-      max_tokens: 500,
-      messages: [
-        {
-          role: "system",
-          content:
-            '你是英语影视台词快速解释助手。只关注最后一句或最值得解释的短语/俚语。用简短自然中文回答，不补造剧情。输出严格 JSON：{"transcript":"原英文","phrase":"核心短语","meaning_zh":"简短含义","context_zh":"在这句话里的意思","usage_zh":"常见用法"}。',
-        },
-        {
-          role: "user",
-          content: JSON.stringify({ transcript, page_title: pageTitle ?? "" }),
-        },
-      ],
-    }),
+    body: JSON.stringify({ transcript, page_title: pageTitle ?? "" }),
   });
-  if (!response.ok)
-    throw new Error(
-      response.status === 401
-        ? "DeepSeek API Key 无效。"
-        : "DeepSeek 解释服务暂时不可用。",
-    );
-  const upstream = DeepSeekResponseSchema.safeParse(
-    await response.json().catch(() => null),
-  );
-  const content = upstream.success
-    ? upstream.data.choices[0]?.message.content
-    : null;
-  if (!content) throw new Error("DeepSeek 没有返回有效解释。");
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(content);
-  } catch {
-    throw new Error("DeepSeek 返回的解释格式无效。");
+  const decoded = (await response.json().catch(() => null)) as unknown;
+  if (!response.ok) {
+    const message =
+      decoded &&
+      typeof decoded === "object" &&
+      "message" in decoded &&
+      typeof decoded.message === "string"
+        ? decoded.message
+        : "解释服务暂时不可用。";
+    throw new Error(message);
   }
   const parsed = QuickAskAnswerSchema.safeParse(decoded);
-  if (!parsed.success) throw new Error("DeepSeek 返回的解释缺少必要内容。");
+  if (!parsed.success) throw new Error("中转服务返回的解释格式无效。");
   return parsed.data;
 }

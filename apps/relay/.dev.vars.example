@@ -1,0 +1,5 @@
+# Copy to .dev.vars only for local testing. Never commit .dev.vars.
+DOUBAO_APP_ID=""
+DOUBAO_ACCESS_TOKEN=""
+DEEPSEEK_API_KEY=""
+RELAY_TOKEN="generate-a-random-base64url-token"

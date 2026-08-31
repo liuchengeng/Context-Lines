@@ -73,6 +73,10 @@ button {
   font-weight: 700;
   cursor: pointer;
 }
+button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
 #status {
   min-height: 22px;
   margin: 2px 0;

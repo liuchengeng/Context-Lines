@@ -1,46 +1,72 @@
 import {
   loadProviderConfig,
+  normalizeRelayBaseUrl,
   saveProviderConfig,
 } from "../../lib/direct-provider";
 import "./styles.css";
 
 const form = document.querySelector<HTMLFormElement>("#form")!;
-const doubaoAppId = document.querySelector<HTMLInputElement>("#doubao-app-id")!;
-const doubaoAccessToken = document.querySelector<HTMLInputElement>(
-  "#doubao-access-token",
-)!;
-const deepseek = document.querySelector<HTMLInputElement>("#deepseek")!;
+const relayUrl = document.querySelector<HTMLInputElement>("#relay-url")!;
+const relayToken = document.querySelector<HTMLInputElement>("#relay-token")!;
 const status = document.querySelector<HTMLParagraphElement>("#status")!;
+const button = document.querySelector<HTMLButtonElement>(
+  "button[type=submit]",
+)!;
 
 void loadProviderConfig().then((config) => {
   if (!config) return;
-  doubaoAppId.value = config.doubaoAppId;
-  doubaoAccessToken.value = config.doubaoAccessToken;
-  deepseek.value = config.deepseekApiKey;
-  status.textContent = "已保存。修改后可再次保存。";
+  relayUrl.value = config.relayUrl;
+  relayToken.value = config.relayToken;
+  status.textContent = "已保存。修改后可再次检查。";
 });
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
-  const appId = doubaoAppId.value.trim();
-  const accessToken = doubaoAccessToken.value.trim();
-  const deepseekApiKey = deepseek.value.trim();
-  if (
-    !/^\d+$/.test(appId) ||
-    accessToken.length < 8 ||
-    deepseekApiKey.length < 8
-  ) {
+  status.dataset.error = "false";
+  let baseUrl: string;
+  try {
+    baseUrl = normalizeRelayBaseUrl(relayUrl.value);
+  } catch (error) {
     status.textContent =
-      "请填写数字 APP ID、Access Token 和 DeepSeek API Key。";
+      error instanceof Error ? error.message : "Worker 地址无效。";
     status.dataset.error = "true";
     return;
   }
-  void saveProviderConfig({
-    doubaoAppId: appId,
-    doubaoAccessToken: accessToken,
-    deepseekApiKey,
-  }).then(() => {
-    status.dataset.error = "false";
-    status.textContent = "保存成功。现在回到视频，点击扩展图标开始监听。";
-  });
+  const token = relayToken.value.trim();
+  if (!/^[A-Za-z0-9_-]{24,128}$/.test(token)) {
+    status.textContent =
+      "连接口令应为 24 到 128 位随机字母、数字、下划线或横线。";
+    status.dataset.error = "true";
+    return;
+  }
+
+  button.disabled = true;
+  status.textContent = "正在检查 Worker…";
+  void fetch(`${baseUrl}/v1/config`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+    .then(async (response) => {
+      const body = (await response.json().catch(() => null)) as unknown;
+      if (!response.ok) {
+        const message =
+          body &&
+          typeof body === "object" &&
+          "message" in body &&
+          typeof body.message === "string"
+            ? body.message
+            : `Worker 检查失败（HTTP ${response.status}）。`;
+        throw new Error(message);
+      }
+      await saveProviderConfig({ relayUrl: baseUrl, relayToken: token });
+      status.dataset.error = "false";
+      status.textContent = "连接成功。现在回到视频，点击扩展图标开始监听。";
+    })
+    .catch((error: unknown) => {
+      status.dataset.error = "true";
+      status.textContent =
+        error instanceof Error ? error.message : "无法连接 Worker。";
+    })
+    .finally(() => {
+      button.disabled = false;
+    });
 });

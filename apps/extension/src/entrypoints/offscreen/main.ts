@@ -4,21 +4,10 @@ import {
   encodeMonoWav,
   resampleLinear,
 } from "../../lib/audio-ring-buffer";
-import {
-  answerWithProviders,
-  type ProviderConfig,
-} from "../../lib/direct-provider";
 
 type StartMessage = { type: "audio:start"; streamId: string; tabId: number };
 type StopMessage = { type: "audio:stop" };
 type ClipMessage = { type: "audio:get-clip" };
-type ProviderMessage = {
-  type: "provider:answer";
-  audioBase64: string;
-  config: ProviderConfig;
-  pageTitle?: string;
-  connectId: string;
-};
 
 let stream: MediaStream | null = null;
 let context: AudioContext | null = null;
@@ -82,7 +71,7 @@ async function startCapture(message: StartMessage): Promise<void> {
 
 chrome.runtime.onMessage.addListener(
   (
-    message: StartMessage | StopMessage | ClipMessage | ProviderMessage,
+    message: StartMessage | StopMessage | ClipMessage,
     _sender,
     sendResponse,
   ) => {
@@ -119,23 +108,6 @@ chrome.runtime.onMessage.addListener(
         durationMs: Math.round((samples.length / 16_000) * 1000),
       });
       return;
-    }
-    if (message.type === "provider:answer") {
-      void answerWithProviders(
-        message.audioBase64,
-        message.config,
-        message.pageTitle,
-        { headersReady: true, connectId: message.connectId },
-      ).then(
-        (answer) => sendResponse({ ok: true, answer }),
-        (error: unknown) =>
-          sendResponse({
-            ok: false,
-            message:
-              error instanceof Error ? error.message : "解释服务请求失败",
-          }),
-      );
-      return true;
     }
   },
 );

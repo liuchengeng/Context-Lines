@@ -4,6 +4,9 @@ import {
   extractPcmFromWav,
   extractTranscript,
   makeDoubaoAudioPacket,
+  loadProviderConfig,
+  normalizeRelayBaseUrl,
+  relayWebSocketUrl,
 } from "../src/lib/direct-provider";
 import { encodeMonoWav } from "../src/lib/audio-ring-buffer";
 
@@ -22,8 +25,38 @@ function makeServerPacket(payload: unknown): ArrayBuffer {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("direct provider", () => {
-  it("extracts PCM and marks the final audio packet without a sequence", async () => {
+describe("relay provider", () => {
+  it("removes legacy model secrets from Chrome storage", async () => {
+    const remove = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("chrome", {
+      storage: {
+        local: {
+          get: vi.fn().mockResolvedValue({
+            providerConfig: {
+              doubaoAppId: "123",
+              doubaoAccessToken: "old-doubao-token",
+              deepseekApiKey: "old-deepseek-key",
+            },
+          }),
+          remove,
+        },
+      },
+    });
+    expect(await loadProviderConfig()).toBeNull();
+    expect(remove).toHaveBeenCalledWith("providerConfig");
+  });
+
+  it("normalizes HTTPS relay URLs and creates the WebSocket endpoint", () => {
+    expect(normalizeRelayBaseUrl("https://demo.workers.dev/")).toBe(
+      "https://demo.workers.dev",
+    );
+    expect(relayWebSocketUrl("https://demo.workers.dev")).toBe(
+      "wss://demo.workers.dev/v1/doubao",
+    );
+    expect(() => normalizeRelayBaseUrl("http://example.com")).toThrow("HTTPS");
+  });
+
+  it("extracts PCM and marks the final audio packet", async () => {
     const wav = new Uint8Array(
       encodeMonoWav(new Float32Array([0, 0.5, -0.5]), 16_000),
     );
@@ -52,18 +85,8 @@ describe("direct provider", () => {
     ).toBe("Read into it.");
   });
 
-  it("streams the clip to Doubao and sends only its transcript to DeepSeek", async () => {
-    const updateSessionRules = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal("chrome", {
-      declarativeNetRequest: {
-        updateSessionRules,
-        RuleActionType: { MODIFY_HEADERS: "modifyHeaders" },
-        HeaderOperation: { SET: "set" },
-        ResourceType: { WEBSOCKET: "websocket" },
-      },
-    });
-
-    const openedUrls: string[] = [];
+  it("uses the relay subprotocol and sends only transcript metadata to explain", async () => {
+    const opened: Array<{ url: string; protocols: string[] }> = [];
     class MockWebSocket {
       binaryType = "blob";
       onopen: (() => void) | null = null;
@@ -71,8 +94,8 @@ describe("direct provider", () => {
       onerror: (() => void) | null = null;
       onclose: ((event: CloseEvent) => void) | null = null;
 
-      constructor(url: string) {
-        openedUrls.push(url);
+      constructor(url: string, protocols: string[]) {
+        opened.push({ url, protocols });
         queueMicrotask(() => this.onopen?.());
       }
 
@@ -82,12 +105,9 @@ describe("direct provider", () => {
           queueMicrotask(() => {
             this.onmessage?.(
               new MessageEvent("message", {
-                data: makeServerPacket({
-                  result: { text: "Not a chance." },
-                }),
+                data: makeServerPacket({ result: { text: "Not a chance." } }),
               }),
             );
-            this.onclose?.({ code: 1000, reason: "" } as CloseEvent);
           });
         }
       }
@@ -100,80 +120,51 @@ describe("direct provider", () => {
     }
     vi.stubGlobal("WebSocket", MockWebSocket);
 
+    const answer = {
+      transcript: "Not a chance.",
+      phrase: "not a chance",
+      meaning_zh: "绝对不可能。",
+      context_zh: "这里是在明确拒绝。",
+      usage_zh: "口语中用于强烈否定。",
+    };
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          choices: [
-            {
-              message: {
-                content: JSON.stringify({
-                  transcript: "Not a chance.",
-                  phrase: "not a chance",
-                  meaning_zh: "绝对不可能。",
-                  context_zh: "这里是在明确拒绝。",
-                  usage_zh: "口语中用于强烈否定。",
-                }),
-              },
-            },
-          ],
-        }),
-        { status: 200 },
-      ),
+      new Response(JSON.stringify(answer), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
     const wav = new Uint8Array(
       encodeMonoWav(new Float32Array(320).fill(0.2), 16_000),
     );
-    const answer = await answerWithProviders(
+    const result = await answerWithProviders(
       Buffer.from(wav).toString("base64"),
       {
-        doubaoAppId: "123456789",
-        doubaoAccessToken: "doubao-token",
-        deepseekApiKey: "deepseek-key",
+        relayUrl: "https://demo.workers.dev",
+        relayToken: "abcdefghijklmnopqrstuvwxyz123456",
       },
       "Video",
     );
 
-    expect(answer.phrase).toBe("not a chance");
-    expect(openedUrls[0]).toContain("bigmodel_nostream");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]?.[1]?.body).toContain("Not a chance.");
-    expect(updateSessionRules).toHaveBeenCalledTimes(2);
-    expect(updateSessionRules.mock.calls[0]?.[0]).toEqual(
+    expect(result.phrase).toBe("not a chance");
+    expect(opened).toEqual([
+      {
+        url: "wss://demo.workers.dev/v1/doubao",
+        protocols: ["contextlines", "abcdefghijklmnopqrstuvwxyz123456"],
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://demo.workers.dev/v1/explain",
       expect.objectContaining({
-        addRules: [
-          expect.objectContaining({
-            action: expect.objectContaining({
-              requestHeaders: expect.arrayContaining([
-                expect.objectContaining({
-                  header: "X-Api-App-Key",
-                  value: "123456789",
-                }),
-                expect.objectContaining({
-                  header: "X-Api-Access-Key",
-                  value: "doubao-token",
-                }),
-                expect.objectContaining({
-                  header: "X-Api-Resource-Id",
-                  value: "volc.bigasr.sauc.duration",
-                }),
-                expect.objectContaining({
-                  header: "X-Api-Connect-Id",
-                }),
-              ]),
-            }),
-            condition: expect.objectContaining({
-              urlFilter:
-                "||openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream",
-              resourceTypes: ["websocket"],
-            }),
-          }),
-        ],
+        headers: expect.objectContaining({
+          Authorization: "Bearer abcdefghijklmnopqrstuvwxyz123456",
+        }),
+        body: JSON.stringify({
+          transcript: "Not a chance.",
+          page_title: "Video",
+        }),
       }),
     );
-    expect(updateSessionRules.mock.calls[1]?.[0]).toEqual({
-      removeRuleIds: [9001],
-    });
   });
 });
