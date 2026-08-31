@@ -94,6 +94,15 @@ export function extractPcmFromWav(
   throw new Error("最近音频中没有可识别的 PCM 数据。");
 }
 
+async function gzip(bytes: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  const input = new Uint8Array(bytes.byteLength);
+  input.set(bytes);
+  const stream = new Blob([input.buffer])
+    .stream()
+    .pipeThrough(new CompressionStream("gzip"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
 function makePacket(
   messageType: number,
   flags: number,
@@ -120,40 +129,42 @@ function makePacket(
   return packet.buffer;
 }
 
-export function makeDoubaoRequestPacket(): ArrayBuffer {
-  const payload = new TextEncoder().encode(
-    JSON.stringify({
-      user: { uid: crypto.randomUUID() },
-      audio: {
-        language: "en-US",
-        format: "pcm",
-        codec: "raw",
-        rate: 16_000,
-        bits: 16,
-        channel: 1,
-      },
-      request: {
-        model_name: "bigmodel",
-        enable_itn: true,
-        enable_punc: true,
-        enable_ddc: false,
-        show_utterances: true,
-      },
-    }),
+export async function makeDoubaoRequestPacket(): Promise<ArrayBuffer> {
+  const payload = await gzip(
+    new TextEncoder().encode(
+      JSON.stringify({
+        user: { uid: crypto.randomUUID() },
+        audio: {
+          language: "en-US",
+          format: "pcm",
+          codec: "raw",
+          rate: 16_000,
+          bits: 16,
+          channel: 1,
+        },
+        request: {
+          model_name: "bigmodel",
+          enable_itn: true,
+          enable_punc: true,
+          enable_ddc: false,
+          show_utterances: true,
+        },
+      }),
+    ),
   );
-  return makePacket(0b0001, 0, 0b0001, payload);
+  return makePacket(0b0001, 0b0001, 0b0001, payload, 1);
 }
 
-export function makeDoubaoAudioPacket(
+export async function makeDoubaoAudioPacket(
   audio: Uint8Array,
   sequence: number,
   isLast: boolean,
-): ArrayBuffer {
+): Promise<ArrayBuffer> {
   return makePacket(
     0b0010,
     isLast ? 0b0011 : 0b0001,
     0,
-    audio,
+    await gzip(audio),
     isLast ? -sequence : sequence,
   );
 }
@@ -252,7 +263,7 @@ export function extractTranscript(value: unknown): string {
 async function installDoubaoHeaders(
   appId: string,
   accessToken: string,
-  requestId: string,
+  connectId: string,
 ): Promise<void> {
   await chrome.declarativeNetRequest.updateSessionRules({
     removeRuleIds: [DOUBAO_AUTH_RULE_ID],
@@ -279,14 +290,9 @@ async function installDoubaoHeaders(
               value: DOUBAO_RESOURCE_ID,
             },
             {
-              header: "X-Api-Request-Id",
+              header: "X-Api-Connect-Id",
               operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-              value: requestId,
-            },
-            {
-              header: "X-Api-Sequence",
-              operation: chrome.declarativeNetRequest.HeaderOperation.SET,
-              value: "-1",
+              value: connectId,
             },
           ],
         },
@@ -335,15 +341,28 @@ async function transcribeOnce(
       }, 20_000);
 
       socket.onopen = () => {
-        socket.send(makeDoubaoRequestPacket());
-        const count = Math.ceil(pcm.byteLength / AUDIO_CHUNK_BYTES);
-        for (let index = 0; index < count; index += 1) {
-          const start = index * AUDIO_CHUNK_BYTES;
-          const chunk = pcm.slice(start, start + AUDIO_CHUNK_BYTES);
-          socket.send(
-            makeDoubaoAudioPacket(chunk, index + 1, index === count - 1),
+        void (async () => {
+          socket.send(await makeDoubaoRequestPacket());
+          const count = Math.ceil(pcm.byteLength / AUDIO_CHUNK_BYTES);
+          for (let index = 0; index < count; index += 1) {
+            const start = index * AUDIO_CHUNK_BYTES;
+            const chunk = pcm.slice(start, start + AUDIO_CHUNK_BYTES);
+            socket.send(
+              await makeDoubaoAudioPacket(
+                chunk,
+                index + 2,
+                index === count - 1,
+              ),
+            );
+          }
+        })().catch((error: unknown) => {
+          socket.close();
+          finish(
+            error instanceof Error
+              ? error
+              : new Error("豆包请求数据生成失败。"),
           );
-        }
+        });
       };
       socket.onmessage = (event: MessageEvent<ArrayBuffer>) => {
         void parseDoubaoPacket(event.data).then(
@@ -369,7 +388,7 @@ async function transcribeOnce(
       socket.onerror = () => {
         finish(
           new Error(
-            "豆包 WebSocket 连接失败，请确认 APP ID、Access Token 与小时版服务属于同一个应用。",
+            `豆包 WebSocket 握手失败（连接 ID：${requestId.slice(0, 8)}）。这是接口连接问题，不是音频问题。`,
           ),
         );
       };
