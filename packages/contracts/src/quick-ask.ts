@@ -10,12 +10,14 @@ export const QuickAskRequestSchema = z.object({
 
 export type QuickAskRequest = z.infer<typeof QuickAskRequestSchema>;
 
+export const QuickAskExplanationSchema = z.object({
+  phrase: z.string().trim().min(1).max(120),
+  meaning_zh: z.string().trim().min(1).max(80),
+});
+
 export const QuickAskAnswerSchema = z.object({
   transcript: z.string().trim().min(1).max(500),
-  phrase: z.string().trim().min(1).max(160),
-  meaning_zh: z.string().trim().min(1).max(240),
-  context_zh: z.string().trim().min(1).max(320),
-  usage_zh: z.string().trim().min(1).max(320),
+  explanations: z.array(QuickAskExplanationSchema).min(1).max(3),
 });
 
 export type QuickAskAnswer = z.infer<typeof QuickAskAnswerSchema>;

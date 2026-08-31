@@ -134,10 +134,7 @@ describe("relay provider", () => {
 
     const answer = {
       transcript: "Not a chance.",
-      phrase: "not a chance",
-      meaning_zh: "绝对不可能。",
-      context_zh: "这里是在明确拒绝。",
-      usage_zh: "口语中用于强烈否定。",
+      explanations: [{ phrase: "Not a chance", meaning_zh: "想都别想" }],
     };
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(answer), {
@@ -159,7 +156,7 @@ describe("relay provider", () => {
       "Video",
     );
 
-    expect(result.phrase).toBe("not a chance");
+    expect(result.explanations[0]?.phrase).toBe("Not a chance");
     expect(opened).toEqual([
       {
         url: "wss://demo.workers.dev/v1/doubao",

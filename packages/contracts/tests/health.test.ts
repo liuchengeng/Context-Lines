@@ -18,15 +18,21 @@ describe("quick ask contracts", () => {
       }).success,
     ).toBe(false);
   });
-  it("requires every concise answer field", () => {
+  it("accepts one to three concise phrase explanations", () => {
     expect(
       QuickAskAnswerSchema.safeParse({
         transcript: "Not a chance.",
-        phrase: "not a chance",
-        meaning_zh: "不可能。",
-        context_zh: "强烈拒绝。",
-        usage_zh: "口语。",
+        explanations: [
+          { phrase: "Not a chance", meaning_zh: "想都别想" },
+          { phrase: "a chance", meaning_zh: "机会" },
+        ],
       }).success,
     ).toBe(true);
+    expect(
+      QuickAskAnswerSchema.safeParse({
+        transcript: "Not a chance.",
+        explanations: [],
+      }).success,
+    ).toBe(false);
   });
 });

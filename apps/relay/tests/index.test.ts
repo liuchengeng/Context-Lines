@@ -83,17 +83,13 @@ describe("relay worker", () => {
   });
 
   it("validates DeepSeek output before returning it", async () => {
-    const answer = {
-      transcript: "Not a chance.",
-      phrase: "not a chance",
-      meaning_zh: "绝对不可能。",
-      context_zh: "这里是在明确拒绝。",
-      usage_zh: "口语中用于强烈否定。",
+    const modelAnswer = {
+      explanations: [{ phrase: "Not a chance", meaning_zh: "想都别想" }],
     };
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({
-          choices: [{ message: { content: JSON.stringify(answer) } }],
+          choices: [{ message: { content: JSON.stringify(modelAnswer) } }],
         }),
         { status: 200 },
       ),
@@ -114,6 +110,9 @@ describe("relay worker", () => {
       context,
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual(answer);
+    expect(await response.json()).toEqual({
+      transcript: "Not a chance.",
+      explanations: modelAnswer.explanations,
+    });
   });
 });

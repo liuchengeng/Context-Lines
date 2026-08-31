@@ -210,19 +210,24 @@ async function updateOverlay(
         .close:hover { background: #26282c; color: #fff; }
         .label { margin: 12px 0 4px; color: #8f9297; font-size: 11px; font-weight: 650; letter-spacing: .02em; }
         .label:first-of-type { margin-top: 0; }
-        .label-phrase { color: #80adf8; }
-        .label-meaning { color: #68cc91; }
         .paused { margin: 0 0 9px; color: #e2bd72; font-size: 11px; }
-        h2 { margin: 0; color: #9bc1ff; font-size: 18px; line-height: 1.4; }
-        .meaning { margin-top: 3px; color: #82dfa7; font-size: 15px; }
         p { margin: 0; color: #d5d6d8; }
-        .detail { color: #c5c7ca; }
+        .sentence { color: #f3f4f6; font-size: 17px; font-weight: 600; line-height: 1.5; }
+        .highlight { padding: 1px 2px; border-radius: 3px; font-weight: 760; }
+        .tone-0 { color: #9bc1ff; }
+        .tone-1 { color: #d7adff; }
+        .tone-2 { color: #ffc27a; }
+        mark.tone-0 { background: rgba(93,145,236,.19); }
+        mark.tone-1 { background: rgba(168,102,225,.18); }
+        mark.tone-2 { background: rgba(232,145,63,.18); }
+        .explanations { margin-top: 2px; }
+        .explanation { display: grid; grid-template-columns: minmax(0,max-content) minmax(0,1fr); gap: 8px; align-items: baseline; padding: 7px 0; border-top: 1px solid #292b2e; }
+        .explanation:first-child { border-top: 0; }
+        .selected-phrase { font-weight: 720; }
+        .brief-meaning { color: #d5d6d8; }
         .loading { display: flex; align-items: center; min-height: 32px; color: #c8c9cc; }
         .dot { width: 7px; height: 7px; margin-right: 9px; border-radius: 50%; background: #8bb8ff; animation: pulse .8s ease-in-out infinite alternate; }
         .error { color: #ffb1b1; }
-        details { margin-top: 13px; padding-top: 10px; border-top: 1px solid #292b2e; }
-        summary { color: #979a9f; font-size: 11px; cursor: pointer; user-select: none; }
-        .transcript { margin-top: 8px; color: #b9bbc0; }
         .resume { width: 100%; height: 34px; margin-top: 13px; border: 1px solid #8bb8ff; border-radius: 7px; background: #8bb8ff; color: #07101f; font: 650 12px/1 Inter,"Segoe UI",system-ui,sans-serif; cursor: pointer; }
         .resume:hover { background: #a6c9ff; }
         .hint { margin-top: 7px; color: #74777c; font-size: 10px; text-align: center; }
@@ -244,6 +249,46 @@ async function updateOverlay(
         element.textContent = text;
         card.append(element);
       };
+      const appendHighlightedTranscript = (
+        container: HTMLElement,
+        transcript: string,
+        explanations: QuickAskAnswer["explanations"],
+      ) => {
+        const lowerTranscript = transcript.toLocaleLowerCase();
+        const matches: Array<{ start: number; end: number; tone: number }> = [];
+        explanations.forEach((explanation, tone) => {
+          const phrase = explanation.phrase.trim().toLocaleLowerCase();
+          if (!phrase) return;
+          let cursor = 0;
+          while (cursor < lowerTranscript.length) {
+            const start = lowerTranscript.indexOf(phrase, cursor);
+            if (start < 0) return;
+            const end = start + phrase.length;
+            const overlaps = matches.some(
+              (match) => start < match.end && end > match.start,
+            );
+            if (!overlaps) {
+              matches.push({ start, end, tone });
+              return;
+            }
+            cursor = start + 1;
+          }
+        });
+        matches.sort((left, right) => left.start - right.start);
+        let cursor = 0;
+        for (const match of matches) {
+          if (match.start > cursor) {
+            container.append(transcript.slice(cursor, match.start));
+          }
+          const mark = document.createElement("mark");
+          mark.className = `highlight tone-${match.tone}`;
+          mark.textContent = transcript.slice(match.start, match.end);
+          container.append(mark);
+          cursor = match.end;
+        }
+        if (cursor < transcript.length)
+          container.append(transcript.slice(cursor));
+      };
       if (host.dataset.pauseTime) {
         addText(
           "p",
@@ -262,23 +307,32 @@ async function updateOverlay(
         addText("p", "处理没有完成", "label");
         addText("p", nextView.message, "error");
       } else {
-        addText("p", "自动选中的英文表达", "label label-phrase");
-        addText("h2", nextView.answer.phrase);
-        addText("p", "中文意思", "label label-meaning");
-        addText("p", nextView.answer.meaning_zh, "meaning");
-        addText("p", "在这句话里", "label");
-        addText("p", nextView.answer.context_zh, "detail");
-        addText("p", "通常怎么用", "label");
-        addText("p", nextView.answer.usage_zh, "detail");
+        addText("p", "识别到的完整英文", "label");
+        const sentence = document.createElement("p");
+        sentence.className = "sentence";
+        appendHighlightedTranscript(
+          sentence,
+          nextView.answer.transcript,
+          nextView.answer.explanations,
+        );
+        card.append(sentence);
 
-        const details = document.createElement("details");
-        const summary = document.createElement("summary");
-        summary.textContent = "查看识别到的完整英文";
-        const transcript = document.createElement("p");
-        transcript.className = "transcript";
-        transcript.textContent = nextView.answer.transcript;
-        details.append(summary, transcript);
-        card.append(details);
+        addText("p", "选出的表达", "label");
+        const explanations = document.createElement("div");
+        explanations.className = "explanations";
+        nextView.answer.explanations.forEach((explanation, tone) => {
+          const row = document.createElement("div");
+          row.className = "explanation";
+          const phrase = document.createElement("span");
+          phrase.className = `selected-phrase tone-${tone}`;
+          phrase.textContent = explanation.phrase;
+          const meaning = document.createElement("span");
+          meaning.className = "brief-meaning";
+          meaning.textContent = `→ ${explanation.meaning_zh}`;
+          row.append(phrase, meaning);
+          explanations.append(row);
+        });
+        card.append(explanations);
       }
       if (nextView.status !== "loading") {
         const resume = document.createElement("button");
