@@ -1,7 +1,8 @@
 import type { QuickAskAnswer } from "@contextlines/contracts";
 import {
-  answerWithProviders,
+  installDoubaoHeaders,
   loadProviderConfig,
+  removeDoubaoHeaders,
 } from "../lib/direct-provider";
 
 const LISTENING_KEY = "quickAskListening";
@@ -11,6 +12,8 @@ type ListeningState = { tabId: number; title?: string; origin?: string };
 type ClipResponse =
   | { ok: true; audioBase64: string; durationMs: number }
   | { ok: false; message: string };
+type ProviderResponse =
+  { ok: true; answer: QuickAskAnswer } | { ok: false; message: string };
 type OverlayView =
   | { status: "toggle" }
   | { status: "loading" }
@@ -221,7 +224,25 @@ async function callQuickAsk(
 ) {
   const config = await loadProviderConfig();
   if (!config) throw new Error("请先点击扩展图标填写豆包和 DeepSeek 密钥。");
-  return answerWithProviders(clip.audioBase64, config, listening.title);
+  const connectId = crypto.randomUUID();
+  await installDoubaoHeaders(
+    config.doubaoAppId,
+    config.doubaoAccessToken,
+    connectId,
+  );
+  try {
+    const response = (await chrome.runtime.sendMessage({
+      type: "provider:answer",
+      audioBase64: clip.audioBase64,
+      config,
+      pageTitle: listening.title,
+      connectId,
+    })) as ProviderResponse;
+    if (!response.ok) throw new Error(response.message);
+    return response.answer;
+  } finally {
+    await removeDoubaoHeaders();
+  }
 }
 
 async function askAboutRecentAudio(): Promise<void> {

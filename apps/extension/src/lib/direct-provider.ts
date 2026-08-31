@@ -258,7 +258,7 @@ export function extractTranscript(value: unknown): string {
   ).trim();
 }
 
-async function installDoubaoHeaders(
+export async function installDoubaoHeaders(
   appId: string,
   accessToken: string,
   connectId: string,
@@ -303,7 +303,7 @@ async function installDoubaoHeaders(
   });
 }
 
-async function removeDoubaoHeaders(): Promise<void> {
+export async function removeDoubaoHeaders(): Promise<void> {
   await chrome.declarativeNetRequest
     .updateSessionRules({ removeRuleIds: [DOUBAO_AUTH_RULE_ID] })
     .catch(() => undefined);
@@ -440,6 +440,7 @@ async function transcribeOnce(
   audioBase64: string,
   appId: string,
   accessToken: string,
+  options?: { headersReady?: boolean; connectId?: string },
 ): Promise<string> {
   const pcm = extractPcmFromWav(decodeBase64(audioBase64));
   if (pcm.byteLength === 0) throw new Error("刚才没有可识别的声音。");
@@ -449,8 +450,9 @@ async function transcribeOnce(
       `扩展捕获到的标签页音频接近静音（峰值 ${audioLevel.peak.toFixed(5)}）。请确认视频正在播放且标签页没有静音。`,
     );
   }
-  const requestId = crypto.randomUUID();
-  await installDoubaoHeaders(appId, accessToken, requestId);
+  const requestId = options?.connectId ?? crypto.randomUUID();
+  if (!options?.headersReady)
+    await installDoubaoHeaders(appId, accessToken, requestId);
   const handshake = observeDoubaoHandshake();
 
   try {
@@ -556,7 +558,7 @@ async function transcribeOnce(
     });
   } finally {
     handshake.cleanup();
-    await removeDoubaoHeaders();
+    if (!options?.headersReady) await removeDoubaoHeaders();
   }
 }
 
@@ -566,9 +568,10 @@ async function transcribe(
   audioBase64: string,
   appId: string,
   accessToken: string,
+  options?: { headersReady?: boolean; connectId?: string },
 ): Promise<string> {
   const task = transcriptionTail.then(() =>
-    transcribeOnce(audioBase64, appId, accessToken),
+    transcribeOnce(audioBase64, appId, accessToken, options),
   );
   transcriptionTail = task.catch(() => undefined);
   return task;
@@ -578,11 +581,13 @@ export async function answerWithProviders(
   audioBase64: string,
   config: ProviderConfig,
   pageTitle?: string,
+  options?: { headersReady?: boolean; connectId?: string },
 ): Promise<QuickAskAnswer> {
   const transcript = await transcribe(
     audioBase64,
     config.doubaoAppId,
     config.doubaoAccessToken,
+    options,
   );
   const response = await fetch(DEEPSEEK_URL, {
     method: "POST",
