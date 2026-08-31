@@ -10,9 +10,6 @@ importers:
       "@google/design.md":
         specifier: ^0.4.0
         version: 0.4.0(supports-color@10.2.2)
-      "@playwright/test":
-        specifier: ^1.55.0
-        version: 1.62.1
       prettier:
         specifier: ^3.6.2
         version: 3.9.6
@@ -28,9 +25,6 @@ importers:
       hono:
         specifier: ^4.13.5
         version: 4.13.5
-      jose:
-        specifier: ^6.1.3
-        version: 6.2.10
       zod:
         specifier: ^4.5.4
         version: 4.5.4
@@ -38,9 +32,6 @@ importers:
       "@cloudflare/workers-types":
         specifier: ^5.20260831.1
         version: 5.20260831.1
-      "@electric-sql/pglite":
-        specifier: ^0.3.14
-        version: 0.3.16
       "@types/node":
         specifier: ^24.10.0
         version: 24.13.3
@@ -59,21 +50,12 @@ importers:
       "@contextlines/contracts":
         specifier: workspace:*
         version: link:../../packages/contracts
-      "@supabase/supabase-js":
-        specifier: ^2.57.4
-        version: 2.112.4
       react:
         specifier: ^19.2.8
         version: 19.2.8
       react-dom:
         specifier: ^19.2.8
         version: 19.2.8(react@19.2.8)
-      ts-fsrs:
-        specifier: ^5.2.3
-        version: 5.4.1
-      zod:
-        specifier: ^4.3.6
-        version: 4.5.4
     devDependencies:
       "@types/chrome":
         specifier: ^0.1.1
@@ -90,9 +72,6 @@ importers:
       "@wxt-dev/module-react":
         specifier: ^1.2.2
         version: 1.2.2(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))(wxt@0.21.4(esbuild@0.28.1)(rolldown@1.2.6)(typescript@5.9.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0)))
-      jsdom:
-        specifier: ^28.1.0
-        version: 28.1.0(supports-color@10.2.2)
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
@@ -102,19 +81,6 @@ importers:
       wxt:
         specifier: ^0.21.4
         version: 0.21.4(esbuild@0.28.1)(rolldown@1.2.6)(typescript@5.9.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))
-
-  evals:
-    dependencies:
-      "@contextlines/contracts":
-        specifier: workspace:*
-        version: link:../packages/contracts
-    devDependencies:
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-      vitest:
-        specifier: ^4.1.11
-        version: 4.1.11(@types/node@24.13.3)(jsdom@28.1.0(supports-color@10.2.2))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/contracts:
     dependencies:
@@ -350,12 +316,6 @@ packages:
         integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==,
       }
     engines: { node: ">=20.19.0" }
-
-  "@electric-sql/pglite@0.3.16":
-    resolution:
-      {
-        integrity: sha512-mZkZfOd9OqTMHsK+1cje8OSzfAQcpD7JmILXTl5ahdempjUDdmg4euf1biDex5/LfQIDJ3gvCu6qDgdnDxfJmA==,
-      }
 
   "@emnapi/runtime@1.11.3":
     resolution:
@@ -903,14 +863,6 @@ packages:
         integrity: sha512-IJ3s6ltHLp45S0bh7phkX+gJO7A1Wuz2EaqpAhb8WjqDwbzMiWKHhyyT42tskaWjEYXtHtVCPpnBJVT9+dcRLg==,
       }
 
-  "@playwright/test@1.62.1":
-    resolution:
-      {
-        integrity: sha512-DTcUc8qii+cpHvtOwggMtBRMjKZHXYWdw8syRYu2vtzuq4Wxphqq4NfCs5Zt44L6mA8rfDfj+PHnxFc/FeK6mQ==,
-      }
-    engines: { node: ">=20" }
-    hasBin: true
-
   "@poppinss/colors@4.1.6":
     resolution:
       {
@@ -1094,59 +1046,6 @@ packages:
       {
         integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==,
       }
-
-  "@supabase/auth-js@2.112.4":
-    resolution:
-      {
-        integrity: sha512-z8DesgwLzKM5PiT0yNmJU8VJyh1zAhYi+20Z7drdJQLXg/wWW4yGt/un+He5ERYUo94Vz66t5aeyr1DIDemI5A==,
-      }
-    engines: { node: ">=22.0.0" }
-
-  "@supabase/functions-js@2.112.4":
-    resolution:
-      {
-        integrity: sha512-DQ0aVH8wSQAccVqNoEkec62qCu2QRNyoGN53RqsVZ1k6F1zq4/v8scrlR6LNT2RJmT97apiTmORijPVhErCS2g==,
-      }
-    engines: { node: ">=22.0.0" }
-
-  "@supabase/phoenix@0.4.5":
-    resolution:
-      {
-        integrity: sha512-aAn9H9ovVyeApKy11OWOrrOGq8DV68yWeH4ud2lN9fzn4aO8Zb5GLL9m1pUg9nLqIcT+ZDfAcsZe0E/nqdv2lw==,
-      }
-
-  "@supabase/postgrest-js@2.112.4":
-    resolution:
-      {
-        integrity: sha512-uaubtPSeg2TR4wrtfQoQWgkTAe+a0qWX2KhmwvTfNl5mGN9+U7owiJt6abk3o/V6O899PSRD1yzxs5RlF4xTug==,
-      }
-    engines: { node: ">=22.0.0" }
-
-  "@supabase/realtime-js@2.112.4":
-    resolution:
-      {
-        integrity: sha512-vZ+j079SKrM0Xiq7MJCvQKLDpaH2kfKfLY68xuQE1sqsCsMmx1CyrDBJHsxZ3cX01VOs5SI9igmoZAF3BmdZxw==,
-      }
-    engines: { node: ">=22.0.0" }
-
-  "@supabase/storage-js@2.112.4":
-    resolution:
-      {
-        integrity: sha512-lQ0JemuTlMIXVKgSci1qez8yPnM5hyDngeAfEBjZS2Om4D+Cus0EE5BE6glFobrxdyii1OF4UzWfF0zcQgDq5A==,
-      }
-    engines: { node: ">=22.0.0" }
-
-  "@supabase/supabase-js@2.112.4":
-    resolution:
-      {
-        integrity: sha512-UiCX1udlFY1fQQrO7Z3GU7obQsju0w5Vk9mOOwalfo/+Gy+tahWVenSSuu5E/GTy/q//HxvGv2IrCdW66/61kw==,
-      }
-    engines: { node: ">=22.0.0" }
-    peerDependencies:
-      "@opentelemetry/api": ">=1.0.0"
-    peerDependenciesMeta:
-      "@opentelemetry/api":
-        optional: true
 
   "@topcli/prompts@4.0.0":
     resolution:
@@ -1869,14 +1768,6 @@ packages:
       }
     engines: { node: ">=0.4.x" }
 
-  fsevents@2.3.2:
-    resolution:
-      {
-        integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==,
-      }
-    engines: { node: ^8.16.0 || ^10.6.0 || >=11.0.0 }
-    os: [darwin]
-
   fsevents@2.3.3:
     resolution:
       {
@@ -1945,13 +1836,6 @@ packages:
       }
     engines: { node: ">= 14" }
 
-  iceberg-js@0.8.1:
-    resolution:
-      {
-        integrity: sha512-1dhVQZXhcHje7798IVM+xoo/1ZdVfzOMIc8/rgVSijRK38EDqOJoGula9N/8ZI5RD8QTxNQtK/Gozpr+qUqRRA==,
-      }
-    engines: { node: ">=20.0.0" }
-
   is-alphabetical@2.0.1:
     resolution:
       {
@@ -2017,12 +1901,6 @@ packages:
         integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==,
       }
     hasBin: true
-
-  jose@6.2.10:
-    resolution:
-      {
-        integrity: sha512-iiW7J9qRFlGxvCOIBDBDxFePQSn7ZMAnrYGhrrOo6siO/MIqwfyilLR27pkfDgUk+raLuzADS8A3S/KLBisc0g==,
-      }
 
   js-tokens@10.0.0:
     resolution:
@@ -2588,22 +2466,6 @@ packages:
         integrity: sha512-y+ichcgc2LrADuhLNAx8DFjVfgz91pRxfZdI3UDhxHvcVEZsenLO+7XaU5vOp0u/7V/wZ+plyuQxtrDlZJ+yeg==,
       }
 
-  playwright-core@1.62.1:
-    resolution:
-      {
-        integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==,
-      }
-    engines: { node: ">=20" }
-    hasBin: true
-
-  playwright@1.62.1:
-    resolution:
-      {
-        integrity: sha512-0M+L3LAD8/nm554LOla9Ayx0j0tmFZ0FBcoQ7F1VuVHpM/XpiC8RcDzBQB8W5+hA8L22THxELzeF+2WcUzvcLg==,
-      }
-    engines: { node: ">=20" }
-    hasBin: true
-
   postcss@8.5.26:
     resolution:
       {
@@ -2897,13 +2759,6 @@ packages:
       {
         integrity: sha512-tmMpK00BjZiUyVyvrBK7knerNgmgvcV/KLVyuma/SC+TQN167GrMRciANTz09+k3zW8L8t60jWO1GpfkZdjTaw==,
       }
-
-  ts-fsrs@5.4.1:
-    resolution:
-      {
-        integrity: sha512-mOp9+oexJexBTkwjg/jQI1aSUQRLIAvbimeKHLSmVdNJPwObugFNKmZkoggH5d6kZ0uaWLboP1Al1DnXAfIb9w==,
-      }
-    engines: { node: ">=20.0.0" }
 
   tslib@2.8.1:
     resolution:
@@ -3329,7 +3184,8 @@ snapshots:
       defu: 6.1.7
       many-keys-map: 3.0.3
 
-  "@acemir/cssom@0.9.31": {}
+  "@acemir/cssom@0.9.31":
+    optional: true
 
   "@aklinker1/rollup-plugin-visualizer@5.12.0":
     dependencies:
@@ -3347,6 +3203,7 @@ snapshots:
       "@csstools/css-color-parser": 4.2.1(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
       "@csstools/css-parser-algorithms": 4.0.0(@csstools/css-tokenizer@4.0.0)
       "@csstools/css-tokenizer": 4.0.0
+    optional: true
 
   "@asamuzakjp/dom-selector@6.8.1":
     dependencies:
@@ -3355,10 +3212,13 @@ snapshots:
       css-tree: 3.2.1
       is-potential-custom-element-name: 1.0.1
       lru-cache: 11.5.2
+    optional: true
 
-  "@asamuzakjp/generational-cache@1.0.1": {}
+  "@asamuzakjp/generational-cache@1.0.1":
+    optional: true
 
-  "@asamuzakjp/nwsapi@2.3.9": {}
+  "@asamuzakjp/nwsapi@2.3.9":
+    optional: true
 
   "@babel/helper-string-parser@7.29.7": {}
 
@@ -3376,6 +3236,7 @@ snapshots:
   "@bramus/specificity@2.4.2":
     dependencies:
       css-tree: 3.2.1
+    optional: true
 
   "@cloudflare/kv-asset-handler@0.5.0": {}
 
@@ -3406,12 +3267,14 @@ snapshots:
     dependencies:
       "@jridgewell/trace-mapping": 0.3.9
 
-  "@csstools/color-helpers@6.1.1": {}
+  "@csstools/color-helpers@6.1.1":
+    optional: true
 
   "@csstools/css-calc@3.3.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)":
     dependencies:
       "@csstools/css-parser-algorithms": 4.0.0(@csstools/css-tokenizer@4.0.0)
       "@csstools/css-tokenizer": 4.0.0
+    optional: true
 
   "@csstools/css-color-parser@4.2.1(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)":
     dependencies:
@@ -3419,18 +3282,20 @@ snapshots:
       "@csstools/css-calc": 3.3.0(@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0))(@csstools/css-tokenizer@4.0.0)
       "@csstools/css-parser-algorithms": 4.0.0(@csstools/css-tokenizer@4.0.0)
       "@csstools/css-tokenizer": 4.0.0
+    optional: true
 
   "@csstools/css-parser-algorithms@4.0.0(@csstools/css-tokenizer@4.0.0)":
     dependencies:
       "@csstools/css-tokenizer": 4.0.0
+    optional: true
 
   "@csstools/css-syntax-patches-for-csstree@1.1.9(css-tree@3.2.1)":
     optionalDependencies:
       css-tree: 3.2.1
+    optional: true
 
-  "@csstools/css-tokenizer@4.0.0": {}
-
-  "@electric-sql/pglite@0.3.16": {}
+  "@csstools/css-tokenizer@4.0.0":
+    optional: true
 
   "@emnapi/runtime@1.11.3":
     dependencies:
@@ -3515,7 +3380,8 @@ snapshots:
   "@esbuild/win32-x64@0.28.1":
     optional: true
 
-  "@exodus/bytes@1.15.1": {}
+  "@exodus/bytes@1.15.1":
+    optional: true
 
   "@google/design.md@0.4.0(supports-color@10.2.2)":
     dependencies:
@@ -3663,10 +3529,6 @@ snapshots:
 
   "@oxc-project/types@0.147.0": {}
 
-  "@playwright/test@1.62.1":
-    dependencies:
-      playwright: 1.62.1
-
   "@poppinss/colors@4.1.6":
     dependencies:
       kleur: 4.1.5
@@ -3731,38 +3593,6 @@ snapshots:
   "@speed-highlight/core@1.2.24": {}
 
   "@standard-schema/spec@1.1.0": {}
-
-  "@supabase/auth-js@2.112.4":
-    dependencies:
-      tslib: 2.8.1
-
-  "@supabase/functions-js@2.112.4":
-    dependencies:
-      tslib: 2.8.1
-
-  "@supabase/phoenix@0.4.5": {}
-
-  "@supabase/postgrest-js@2.112.4":
-    dependencies:
-      tslib: 2.8.1
-
-  "@supabase/realtime-js@2.112.4":
-    dependencies:
-      "@supabase/phoenix": 0.4.5
-      tslib: 2.8.1
-
-  "@supabase/storage-js@2.112.4":
-    dependencies:
-      iceberg-js: 0.8.1
-      tslib: 2.8.1
-
-  "@supabase/supabase-js@2.112.4":
-    dependencies:
-      "@supabase/auth-js": 2.112.4
-      "@supabase/functions-js": 2.112.4
-      "@supabase/postgrest-js": 2.112.4
-      "@supabase/realtime-js": 2.112.4
-      "@supabase/storage-js": 2.112.4
 
   "@topcli/prompts@4.0.0": {}
 
@@ -3905,7 +3735,8 @@ snapshots:
 
   acorn@8.18.0: {}
 
-  agent-base@7.1.4: {}
+  agent-base@7.1.4:
+    optional: true
 
   ansi-regex@5.0.1: {}
 
@@ -3920,6 +3751,7 @@ snapshots:
   bidi-js@1.0.3:
     dependencies:
       require-from-string: 2.0.2
+    optional: true
 
   blake3-wasm@2.1.5: {}
 
@@ -4000,6 +3832,7 @@ snapshots:
     dependencies:
       mdn-data: 2.27.1
       source-map-js: 1.2.1
+    optional: true
 
   css-what@8.0.0: {}
 
@@ -4011,6 +3844,7 @@ snapshots:
       "@csstools/css-syntax-patches-for-csstree": 1.1.9(css-tree@3.2.1)
       css-tree: 3.2.1
       lru-cache: 11.5.2
+    optional: true
 
   csstype@3.2.3: {}
 
@@ -4020,6 +3854,7 @@ snapshots:
       whatwg-url: 16.0.1
     transitivePeerDependencies:
       - "@noble/hashes"
+    optional: true
 
   debug@4.4.3(supports-color@10.2.2):
     dependencies:
@@ -4027,7 +3862,8 @@ snapshots:
     optionalDependencies:
       supports-color: 10.2.2
 
-  decimal.js@10.6.0: {}
+  decimal.js@10.6.0:
+    optional: true
 
   decode-named-character-reference@1.3.0:
     dependencies:
@@ -4163,9 +3999,6 @@ snapshots:
 
   format@0.2.2: {}
 
-  fsevents@2.3.2:
-    optional: true
-
   fsevents@2.3.3:
     optional: true
 
@@ -4182,6 +4015,7 @@ snapshots:
       "@exodus/bytes": 1.15.1
     transitivePeerDependencies:
       - "@noble/hashes"
+    optional: true
 
   html-escaper@3.0.3: {}
 
@@ -4198,6 +4032,7 @@ snapshots:
       debug: 4.4.3(supports-color@10.2.2)
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   https-proxy-agent@7.0.6(supports-color@10.2.2):
     dependencies:
@@ -4205,8 +4040,7 @@ snapshots:
       debug: 4.4.3(supports-color@10.2.2)
     transitivePeerDependencies:
       - supports-color
-
-  iceberg-js@0.8.1: {}
+    optional: true
 
   is-alphabetical@2.0.1: {}
 
@@ -4232,8 +4066,6 @@ snapshots:
       is-docker: 2.2.1
 
   jiti@2.7.0: {}
-
-  jose@6.2.10: {}
 
   js-tokens@10.0.0: {}
 
@@ -4263,6 +4095,7 @@ snapshots:
     transitivePeerDependencies:
       - "@noble/hashes"
       - supports-color
+    optional: true
 
   json5@2.2.3: {}
 
@@ -4335,7 +4168,8 @@ snapshots:
 
   longest-streak@3.1.0: {}
 
-  lru-cache@11.5.2: {}
+  lru-cache@11.5.2:
+    optional: true
 
   magic-string@0.30.21:
     dependencies:
@@ -4451,7 +4285,8 @@ snapshots:
     dependencies:
       "@types/mdast": 4.0.4
 
-  mdn-data@2.27.1: {}
+  mdn-data@2.27.1:
+    optional: true
 
   micromark-core-commonmark@2.0.3:
     dependencies:
@@ -4722,6 +4557,7 @@ snapshots:
   parse5@8.0.1:
     dependencies:
       entities: 8.0.0
+    optional: true
 
   path-to-regexp@6.3.0: {}
 
@@ -4747,14 +4583,6 @@ snapshots:
       exsolve: 1.1.1
       pathe: 2.0.3
 
-  playwright-core@1.62.1: {}
-
-  playwright@1.62.1:
-    dependencies:
-      playwright-core: 1.62.1
-    optionalDependencies:
-      fsevents: 2.3.2
-
   postcss@8.5.26:
     dependencies:
       nanoid: 3.3.18
@@ -4769,7 +4597,8 @@ snapshots:
       cac: 7.0.0
       tasuku: 2.3.0
 
-  punycode@2.3.1: {}
+  punycode@2.3.1:
+    optional: true
 
   quansync@0.2.11: {}
 
@@ -4820,7 +4649,8 @@ snapshots:
 
   require-directory@2.1.1: {}
 
-  require-from-string@2.0.2: {}
+  require-from-string@2.0.2:
+    optional: true
 
   rolldown@1.2.6:
     dependencies:
@@ -4846,6 +4676,7 @@ snapshots:
   saxes@6.0.0:
     dependencies:
       xmlchars: 2.2.0
+    optional: true
 
   scheduler@0.27.0: {}
 
@@ -4918,7 +4749,8 @@ snapshots:
 
   supports-color@10.2.2: {}
 
-  symbol-tree@3.2.4: {}
+  symbol-tree@3.2.4:
+    optional: true
 
   tasuku@2.3.0: {}
 
@@ -4935,25 +4767,28 @@ snapshots:
 
   tinyrainbow@3.1.1: {}
 
-  tldts-core@7.4.11: {}
+  tldts-core@7.4.11:
+    optional: true
 
   tldts@7.4.11:
     dependencies:
       tldts-core: 7.4.11
+    optional: true
 
   tough-cookie@6.0.2:
     dependencies:
       tldts: 7.4.11
+    optional: true
 
   tr46@6.0.0:
     dependencies:
       punycode: 2.3.1
+    optional: true
 
   trough@2.2.0: {}
 
-  ts-fsrs@5.4.1: {}
-
-  tslib@2.8.1: {}
+  tslib@2.8.1:
+    optional: true
 
   typescript@5.9.3: {}
 
@@ -5100,12 +4935,15 @@ snapshots:
   w3c-xmlserializer@5.0.0:
     dependencies:
       xml-name-validator: 5.0.0
+    optional: true
 
-  webidl-conversions@8.0.1: {}
+  webidl-conversions@8.0.1:
+    optional: true
 
   webpack-virtual-modules@0.6.2: {}
 
-  whatwg-mimetype@5.0.0: {}
+  whatwg-mimetype@5.0.0:
+    optional: true
 
   whatwg-url@16.0.1:
     dependencies:
@@ -5114,6 +4952,7 @@ snapshots:
       webidl-conversions: 8.0.1
     transitivePeerDependencies:
       - "@noble/hashes"
+    optional: true
 
   why-is-node-running@2.3.0:
     dependencies:
@@ -5199,9 +5038,11 @@ snapshots:
       - unloader
       - webpack
 
-  xml-name-validator@5.0.0: {}
+  xml-name-validator@5.0.0:
+    optional: true
 
-  xmlchars@2.2.0: {}
+  xmlchars@2.2.0:
+    optional: true
 
   y18n@5.0.8: {}
 

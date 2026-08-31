@@ -1,0 +1,124 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  background: #08090a;
+  color: #f5f5f5;
+  font-feature-settings: "calt", "kern", "liga";
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 380px;
+  background: #08090a;
+}
+main {
+  min-height: 100vh;
+}
+header {
+  height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #a5a7ab;
+  font-size: 12px;
+  border-bottom: 1px solid #292b2e;
+}
+.mark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #f5f5f5;
+  color: #090a0b;
+  font-weight: 800;
+}
+kbd {
+  margin-left: auto;
+  border: 1px solid #34363a;
+  border-radius: 5px;
+  padding: 2px 6px;
+  color: #777a7f;
+  font: inherit;
+}
+section {
+  padding: 20px;
+}
+.loading {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #a5a7ab;
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #383a3e;
+  border-top-color: #f5f5f5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.eyebrow,
+dt {
+  margin: 0 0 7px;
+  color: #85888d;
+  font-size: 11px;
+  font-weight: 600;
+}
+h1 {
+  margin: 0 0 18px;
+  font-size: 21px;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+.meaning {
+  padding: 14px;
+  border: 1px solid #303236;
+  border-radius: 9px;
+  background: #101113;
+}
+.meaning strong {
+  font-size: 16px;
+}
+.meaning p {
+  margin: 7px 0 0;
+  color: #e2e3e5;
+  line-height: 1.6;
+}
+dl {
+  margin: 18px 0;
+}
+dl div {
+  padding: 12px 0;
+  border-top: 1px solid #25272a;
+}
+dd {
+  margin: 0;
+  color: #c8c9cc;
+  font-size: 13px;
+  line-height: 1.65;
+}
+button {
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  border-radius: 7px;
+  background: #f5f5f5;
+  color: #090a0b;
+  font-weight: 650;
+  cursor: pointer;
+}
+.error p {
+  color: #b7b9bd;
+  line-height: 1.6;
+}

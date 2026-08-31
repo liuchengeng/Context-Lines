@@ -1,10 +1,10 @@
 interface Env {
-  ALLOWED_EMAIL: string;
+  QUICK_ASK_ACCESS_TOKEN?: string;
+  QWEN_ASR_BASE_URL?: string;
+  QWEN_ASR_MODEL?: string;
+  DASHSCOPE_API_KEY?: string;
+  DEEPSEEK_BASE_URL?: string;
+  DEEPSEEK_API_KEY?: string;
+  DEEPSEEK_MODEL?: string;
   ALLOWED_EXTENSION_ID: string;
-  OPENAI_API_KEY: string;
-  OPENAI_TRANSCRIPTION_MODEL: string;
-  OPENAI_QUICK_ANALYSIS_MODEL: string;
-  OPENAI_DEEP_ANALYSIS_MODEL: string;
-  SUPABASE_URL: string;
-  SUPABASE_ANON_KEY: string;
 }

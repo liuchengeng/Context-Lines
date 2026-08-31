@@ -1,8 +1,4 @@
-export * from "./analysis";
 export * from "./errors";
-export * from "./learning";
-export * from "./messages";
-export * from "./realtime";
-export * from "./transcript";
+export * from "./quick-ask";
 
-export const CONTRACT_VERSION = "0.1.0" as const;
+export const CONTRACT_VERSION = "0.2.0" as const;

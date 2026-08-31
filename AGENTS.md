@@ -12,8 +12,8 @@
 ## Project-Specific Rules
 
 - Use pnpm workspace commands from the repository root.
-- Keep browser-to-worker payloads within the schemas in `packages/contracts`; never add full URLs, page body text, raw audio, or full transcript history.
-- Keep permanent OpenAI credentials in Worker secrets only. Browser code may receive only short-lived Realtime client secrets.
+- Keep browser-to-worker payloads within `packages/contracts`; only the user-triggered recent WAV clip, page title, and origin may be sent.
+- Keep Qwen and DeepSeek credentials in Worker secrets only.
 - Do not add persistent session, audio, transcript-history, or browsing-history storage.
 - `apps/extension` targets desktop Chrome 116+ only. Do not broaden host permissions beyond explicit active-tab injection.
 - Treat `apps/extension/.output`, `dist`, coverage, Playwright output, `.wrangler`, and local environment files as generated or local artifacts.
@@ -22,7 +22,6 @@
 ## Validation
 
 - Standard gate: `pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
-- Run `pnpm test:db` after SQL/schema changes and `pnpm test:e2e` after capture or UI-flow changes when local Chrome supports it.
 - Run `pnpm design:lint` after editing `DESIGN.md`.
 
 ## Documentation Ownership

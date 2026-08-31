@@ -1,57 +1,34 @@
-# ContextLines
+# ContextLines Quick Ask
 
-ContextLines 是面向单个允许邮箱的 Chrome 116+ 英语语境学习扩展。用户主动捕获普通网页标签页音频后可查看实时英文字幕，并在点击确认台词时按需生成翻译与语用解释；只有主动收藏的表达和复习进度会持久化。
+一个只做一件事的 Chrome 116+ 扩展：保留当前视频标签页最近约 10 秒的声音，按 `Alt+Q` 暂停视频并解释刚才听到的英语短语或俚语。
 
-## Quick Start
-
-### Prerequisites
-
-- Node.js 24+
-- pnpm 11+
-- Google Chrome 116+
-
-### Install
+## 本地试用（不调用模型）
 
 ```powershell
-pnpm install
+cd D:\subtitle
+$env:WXT_PUBLIC_USE_MOCKS="true"
+corepack pnpm dev
 ```
 
-### Run
+在 `chrome://extensions` 开启开发者模式，点击“加载已解压的扩展程序”，选择 `D:\subtitle\apps\extension\.output\chrome-mv3`。
+
+1. 打开普通网页视频并开始播放。
+2. 点击扩展图标，角标显示 `ON`。
+3. 播放至少一秒后按 `Alt+Q`。
+4. 视频自动暂停，小窗口显示 mock 解释；关闭窗口后继续播放。
+5. 再次点击扩展图标即可停止监听。
+
+如果快捷键无效，在 `chrome://extensions/shortcuts` 为 ContextLines Quick Ask 设置快捷键。
+
+## 真实模型
+
+Worker 的 `POST /v1/quick-ask` 先使用 Qwen ASR 转写 10 秒 WAV，再使用 DeepSeek 输出简短结构化解释。复制 `.env.example` 中的配置到本地环境；真实密钥不得提交。当前仓库只生成可部署代码，不创建或部署远程资源。
+
+## 检查
 
 ```powershell
-pnpm dev
+corepack pnpm format:check
+corepack pnpm typecheck
+corepack pnpm test
+corepack pnpm build
 ```
-
-扩展开发构建位于 `apps/extension/.output/chrome-mv3`。在 `chrome://extensions` 开启开发者模式并加载该目录。未配置云端环境时，可通过 `.env.example` 中的显式 mock 开关运行本地合成流程；mock 不代表真实 OAuth、RLS 或 OpenAI 验收。
-
-### Verification
-
-```powershell
-pnpm format:check
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:db
-pnpm eval
-pnpm test:e2e
-pnpm build
-```
-
-## Configuration
-
-项目只读取 [.env.example](./.env.example) 列出的变量。复制为本地 `.env` 或按各运行时的 secret 机制设置，禁止提交真实凭证。
-
-## Project Documentation
-
-- 产品范围：[docs/project-charter.md](./docs/project-charter.md)
-- 当前计划：[docs/project-plan.md](./docs/project-plan.md)
-- 技术架构：[docs/architecture.md](./docs/architecture.md)
-- 仓库结构：[docs/project-structure.md](./docs/project-structure.md)
-- UI 设计系统：[DESIGN.md](./DESIGN.md)
-- 质量报告：[docs/quality-report.md](./docs/quality-report.md)
-- 部署预检：[docs/deployment-preflight.md](./docs/deployment-preflight.md)
-- Agent 规则：[AGENTS.md](./AGENTS.md)
-
-## External Operations
-
-本仓库不包含已创建的 Supabase 项目、Cloudflare Worker 或线上部署。应用迁移、设置 secrets、OAuth 配置、添加 Git remote、推送与发布必须另行核对并授权。

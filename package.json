@@ -15,13 +15,10 @@
     "format:check": "prettier --check .",
     "test": "pnpm -r --if-present test",
     "test:db": "pnpm --filter @contextlines/api test:db",
-    "test:e2e": "playwright test",
-    "eval": "pnpm --filter @contextlines/evals test",
     "design:lint": "designmd lint DESIGN.md"
   },
   "devDependencies": {
     "@google/design.md": "^0.4.0",
-    "@playwright/test": "^1.55.0",
     "prettier": "^3.6.2",
     "typescript": "^5.9.2"
   }
