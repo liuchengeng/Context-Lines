@@ -6,6 +6,7 @@ import {
   makeDoubaoAudioPacket,
   loadProviderConfig,
   normalizeRelayBaseUrl,
+  relayControlError,
   relayWebSocketUrl,
 } from "../src/lib/direct-provider";
 import { encodeMonoWav } from "../src/lib/audio-ring-buffer";
@@ -26,6 +27,17 @@ function makeServerPacket(payload: unknown): ArrayBuffer {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("relay provider", () => {
+  it("decodes relay errors and preserves unexpected plain text", () => {
+    expect(
+      relayControlError(
+        `contextlines-error:${encodeURIComponent("豆包鉴权失败。")}`,
+      )?.message,
+    ).toBe("豆包鉴权失败。");
+    expect(relayControlError("upstream unavailable")?.message).toBe(
+      "中转服务收到纯文本：upstream unavailable",
+    );
+  });
+
   it("removes legacy model secrets from Chrome storage", async () => {
     const remove = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("chrome", {

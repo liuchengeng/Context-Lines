@@ -6,6 +6,7 @@ const DOUBAO_URL =
 export const DOUBAO_RESOURCE_ID = "volc.seedasr.sauc.duration";
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const RELAY_PROTOCOL = "contextlines";
+const RELAY_ERROR_PREFIX = "contextlines-error:";
 const MAX_QUEUED_BYTES = 1024 * 1024;
 
 export interface Env {
@@ -102,7 +103,7 @@ function safeHeader(value: string | null): string {
 
 function sendRelayError(socket: WebSocket, message: string): void {
   if (socket.readyState !== 1) return;
-  socket.send(JSON.stringify({ type: "relay_error", message }));
+  socket.send(`${RELAY_ERROR_PREFIX}${encodeURIComponent(message)}`);
 }
 
 function closeSocket(

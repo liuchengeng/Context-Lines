@@ -6,6 +6,7 @@ import {
 const CONFIG_KEY = "providerConfig";
 const AUDIO_CHUNK_BYTES = 6_400;
 const RELAY_PROTOCOL = "contextlines";
+const RELAY_ERROR_PREFIX = "contextlines-error:";
 
 export type ProviderConfig = {
   relayUrl: string;
@@ -300,14 +301,29 @@ function summarizeDoubaoPayload(value: unknown): string {
   }).slice(0, 400);
 }
 
-function relayControlError(value: string): Error | null {
+export function relayControlError(value: string): Error | null {
+  if (value.startsWith(RELAY_ERROR_PREFIX)) {
+    try {
+      return new Error(
+        decodeURIComponent(value.slice(RELAY_ERROR_PREFIX.length)),
+      );
+    } catch {
+      return new Error("中转服务返回了损坏的错误消息。");
+    }
+  }
   try {
     const data = JSON.parse(value) as Record<string, unknown>;
     return data.type === "relay_error" && typeof data.message === "string"
       ? new Error(data.message)
       : null;
   } catch {
-    return new Error("中转服务返回了无法识别的消息。");
+    const detail = value
+      .replace(/[\u0000-\u001f\u007f]/g, " ")
+      .trim()
+      .slice(0, 180);
+    return new Error(
+      detail ? `中转服务收到纯文本：${detail}` : "中转服务返回了空文本消息。",
+    );
   }
 }
 
