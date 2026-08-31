@@ -13,6 +13,7 @@ export default defineConfig({
       "scripting",
       "storage",
       "tabCapture",
+      "webRequest",
     ],
     host_permissions: [
       "https://openspeech.bytedance.com/*",

@@ -11,6 +11,10 @@ const DOUBAO_RESOURCE_ID = "volc.bigasr.sauc.duration";
 const DOUBAO_AUTH_RULE_ID = 9_001;
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const AUDIO_CHUNK_BYTES = 6_400;
+const DOUBAO_URL_FILTER = {
+  urls: ["wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_nostream"],
+  types: ["websocket" as const],
+};
 
 export type ProviderConfig = {
   doubaoAppId: string;
@@ -311,6 +315,77 @@ async function removeDoubaoHeaders(): Promise<void> {
     .catch(() => undefined);
 }
 
+type HandshakeDiagnostic = {
+  statusCode?: number;
+  apiStatus?: string;
+  apiMessage?: string;
+  logId?: string;
+  authHeadersSeen: boolean;
+};
+
+function observeDoubaoHandshake(): {
+  diagnostic: HandshakeDiagnostic;
+  cleanup: () => void;
+} {
+  const diagnostic: HandshakeDiagnostic = { authHeadersSeen: false };
+  const webRequest = chrome.webRequest;
+  if (!webRequest?.onBeforeSendHeaders || !webRequest.onHeadersReceived) {
+    return { diagnostic, cleanup: () => undefined };
+  }
+  const before = (details: chrome.webRequest.OnBeforeSendHeadersDetails) => {
+    const names = new Set(
+      (details.requestHeaders ?? []).map((header) => header.name.toLowerCase()),
+    );
+    diagnostic.authHeadersSeen =
+      names.has("x-api-app-key") &&
+      names.has("x-api-access-key") &&
+      names.has("x-api-resource-id") &&
+      names.has("x-api-connect-id");
+    return undefined;
+  };
+  const received = (details: chrome.webRequest.OnHeadersReceivedDetails) => {
+    diagnostic.statusCode = details.statusCode;
+    const headers = new Map(
+      (details.responseHeaders ?? []).map((header) => [
+        header.name.toLowerCase(),
+        header.value ?? "",
+      ]),
+    );
+    const apiStatus = headers.get("x-api-status-code");
+    const apiMessage = headers.get("x-api-message");
+    const logId = headers.get("x-tt-logid");
+    if (apiStatus) diagnostic.apiStatus = apiStatus;
+    if (apiMessage) diagnostic.apiMessage = apiMessage;
+    if (logId) diagnostic.logId = logId;
+    return undefined;
+  };
+  webRequest.onBeforeSendHeaders.addListener(before, DOUBAO_URL_FILTER, [
+    "requestHeaders",
+    "extraHeaders",
+  ]);
+  webRequest.onHeadersReceived.addListener(received, DOUBAO_URL_FILTER, [
+    "responseHeaders",
+    "extraHeaders",
+  ]);
+  return {
+    diagnostic,
+    cleanup: () => {
+      webRequest.onBeforeSendHeaders.removeListener(before);
+      webRequest.onHeadersReceived.removeListener(received);
+    },
+  };
+}
+
+function formatHandshakeError(diagnostic: HandshakeDiagnostic): string {
+  const parts = ["豆包 WebSocket 握手失败"];
+  if (diagnostic.statusCode) parts.push(`HTTP ${diagnostic.statusCode}`);
+  if (diagnostic.apiStatus) parts.push(`状态 ${diagnostic.apiStatus}`);
+  if (diagnostic.apiMessage) parts.push(diagnostic.apiMessage);
+  if (!diagnostic.authHeadersSeen) parts.push("Chrome 未注入鉴权请求头");
+  if (diagnostic.logId) parts.push(`LogID ${diagnostic.logId}`);
+  return `${parts.join("；")}。`;
+}
+
 async function transcribeOnce(
   audioBase64: string,
   appId: string,
@@ -320,6 +395,7 @@ async function transcribeOnce(
   if (pcm.byteLength === 0) throw new Error("刚才没有可识别的声音。");
   const requestId = crypto.randomUUID();
   await installDoubaoHeaders(appId, accessToken, requestId);
+  const handshake = observeDoubaoHandshake();
 
   try {
     return await new Promise<string>((resolve, reject) => {
@@ -386,15 +462,14 @@ async function transcribeOnce(
         );
       };
       socket.onerror = () => {
-        finish(
-          new Error(
-            `豆包 WebSocket 握手失败（连接 ID：${requestId.slice(0, 8)}）。这是接口连接问题，不是音频问题。`,
-          ),
-        );
+        setTimeout(() => {
+          finish(new Error(formatHandshakeError(handshake.diagnostic)));
+        }, 100);
       };
       socket.onclose = () => finish();
     });
   } finally {
+    handshake.cleanup();
     await removeDoubaoHeaders();
   }
 }
