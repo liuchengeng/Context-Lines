@@ -76,10 +76,17 @@ export default defineBackground(() => {
   const captureRegistry = new CaptureRegistry(chrome.storage.session);
 
   void browser.sidePanel
-    .setPanelBehavior({ openPanelOnActionClick: true })
+    .setPanelBehavior({ openPanelOnActionClick: false })
     .catch((error: unknown) => {
       console.error("Failed to configure the ContextLines side panel", error);
     });
+
+  chrome.action.onClicked.addListener((tab) => {
+    if (tab.windowId === undefined) return;
+    void chrome.sidePanel.open({ windowId: tab.windowId }).catch((error) => {
+      console.error("Failed to open the ContextLines side panel", error);
+    });
+  });
 
   const requestStop = async (
     reason: Extract<
