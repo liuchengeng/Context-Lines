@@ -7,14 +7,14 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "pnpm --filter @contextlines/extension dev",
-    "build": "pnpm -r --if-present build",
-    "typecheck": "pnpm -r --if-present typecheck",
-    "lint": "pnpm -r --if-present lint",
+    "dev": "corepack pnpm --filter @contextlines/extension dev",
+    "build": "corepack pnpm -r --if-present build",
+    "typecheck": "corepack pnpm -r --if-present typecheck",
+    "lint": "corepack pnpm -r --if-present lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "pnpm -r --if-present test",
-    "test:db": "pnpm --filter @contextlines/api test:db",
+    "test": "corepack pnpm -r --if-present test",
+    "test:db": "corepack pnpm --filter @contextlines/api test:db",
     "design:lint": "designmd lint DESIGN.md"
   },
   "devDependencies": {

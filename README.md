@@ -10,7 +10,7 @@ $env:WXT_PUBLIC_USE_MOCKS="true"
 corepack pnpm dev
 ```
 
-在 `chrome://extensions` 开启开发者模式，点击“加载已解压的扩展程序”，选择 `D:\subtitle\apps\extension\.output\chrome-mv3`。
+保持终端运行。在 `chrome://extensions` 开启开发者模式，点击“加载已解压的扩展程序”，选择 `D:\subtitle\apps\extension\.output\chrome-mv3-dev`。如果之前加载过旧版，先移除旧版或改为这个新目录。
 
 1. 打开普通网页视频并开始播放。
 2. 点击扩展图标，角标显示 `ON`。
