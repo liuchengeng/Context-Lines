@@ -1,6 +1,6 @@
 # ContextLines Quick Ask
 
-一个个人使用的 Chrome 116+ 扩展：在内存中保留当前视频最近约 10 秒声音，按 `Alt+Q` 后才经个人 Cloudflare Worker 调用豆包流式语音识别小时版与 DeepSeek 中文解释。它不会暂停视频、退出全屏或保存音频与转写历史。
+一个个人使用的 Chrome 116+ 扩展：在内存中保留当前视频最近约 10 秒声音，按 `Alt+Q` 后暂停当前视频，并经个人 Cloudflare Worker 调用豆包流式语音识别小时版与 DeepSeek 中文解释。关闭解释后自动继续播放，不退出全屏，也不保存音频与转写历史。
 
 ## 本地开发
 
@@ -43,7 +43,7 @@ corepack pnpm --filter @contextlines/relay exec wrangler secret put RELAY_TOKEN
 corepack pnpm --filter @contextlines/relay exec wrangler deploy
 ```
 
-部署输出会给出 `https://...workers.dev` 地址。重新加载扩展，点击图标，在设置页只填 Worker 地址和随机连接口令。检查成功后回到视频，再点击扩展图标；绿色 `ON` 表示开始缓存最近音频。播放几秒后按 `Alt+Q` 查看解释。
+部署输出会给出 `https://...workers.dev` 地址。重新加载扩展，点击图标，在设置页只填 Worker 地址和随机连接口令。检查成功后回到视频，再点击扩展图标；绿色 `ON` 表示开始缓存最近音频。播放几秒后按 `Alt+Q`，视频会立即暂停并显示时间点；点击 `×` 或再按一次 `Alt+Q` 关闭解释并继续播放。
 
 ## 隐私边界
 
