@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ContextLines 设置</title>
+  </head>
+  <body>
+    <main>
+      <div class="brand">Q</div>
+      <h1>连接模型</h1>
+      <p class="intro">
+        只需设置一次。密钥保存在这台电脑的 Chrome 扩展存储中，不会发送给网页。
+      </p>
+      <form id="form">
+        <label
+          >豆包语音 App Key<input
+            id="doubao"
+            name="doubao"
+            type="password"
+            autocomplete="off"
+            required
+            placeholder="新版豆包语音控制台 App Key" /></label
+        ><small>需要开通录音文件极速版识别（volc.bigasr.auc_turbo）</small
+        ><label
+          >DeepSeek API Key<input
+            id="deepseek"
+            name="deepseek"
+            type="password"
+            autocomplete="off"
+            required
+            placeholder="sk-..." /></label
+        ><button type="submit">保存设置</button>
+        <p id="status" role="status"></p>
+      </form>
+      <p class="privacy">
+        密钥会持久保存在
+        <code>chrome.storage.local</code>，并仅由扩展后台直接请求豆包和
+        DeepSeek。卸载扩展会删除这些设置。
+      </p>
+    </main>
+    <script type="module" src="./options/main.ts"></script>
+  </body>
+</html>

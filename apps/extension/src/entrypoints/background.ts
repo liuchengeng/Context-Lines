@@ -1,8 +1,8 @@
+import type { QuickAskAnswer } from "@contextlines/contracts";
 import {
-  QuickAskAnswerSchema,
-  type QuickAskAnswer,
-  WorkerErrorSchema,
-} from "@contextlines/contracts";
+  answerWithProviders,
+  loadProviderConfig,
+} from "../lib/direct-provider";
 
 const LISTENING_KEY = "quickAskListening";
 const OFFSCREEN_PATH = "offscreen.html";
@@ -98,6 +98,12 @@ async function startListening(tab: chrome.tabs.Tab): Promise<void> {
 
 async function toggleListening(tab: chrome.tabs.Tab): Promise<void> {
   if (await getListening()) return stopListening();
+  if (!(await loadProviderConfig())) {
+    await chrome.action.setBadgeBackgroundColor({ color: "#8a6d32" });
+    await chrome.action.setBadgeText({ tabId: tab.id, text: "?" });
+    await chrome.runtime.openOptionsPage();
+    return;
+  }
   try {
     await startListening(tab);
   } catch (error) {
@@ -213,44 +219,9 @@ async function callQuickAsk(
   listening: ListeningState,
   clip: Extract<ClipResponse, { ok: true }>,
 ) {
-  if (import.meta.env.WXT_PUBLIC_USE_MOCKS === "true") {
-    await new Promise((resolve) => setTimeout(resolve, 450));
-    return QuickAskAnswerSchema.parse({
-      transcript: "I wouldn't read too much into it.",
-      phrase: "read too much into it",
-      meaning_zh: "别过度解读，别给这件事附加太多含义。",
-      context_zh: "说话人是在降低某个信号的重要性，让对方别想得太多。",
-      usage_zh: "常用于劝人不要根据一个动作、消息或细节做太多推断。",
-    });
-  }
-  const baseUrl = import.meta.env.WXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
-  if (!baseUrl) throw new Error("尚未配置问答服务地址");
-  const response = await fetch(`${baseUrl}/v1/quick-ask`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(import.meta.env.WXT_PUBLIC_QUICK_ASK_ACCESS_TOKEN
-        ? {
-            Authorization: `Bearer ${import.meta.env.WXT_PUBLIC_QUICK_ASK_ACCESS_TOKEN}`,
-          }
-        : {}),
-    },
-    body: JSON.stringify({
-      audio_base64: clip.audioBase64,
-      mime_type: "audio/wav",
-      duration_ms: clip.durationMs,
-      ...(listening.title ? { page_title: listening.title } : {}),
-      ...(listening.origin ? { page_origin: listening.origin } : {}),
-    }),
-  });
-  const payload: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const parsed = WorkerErrorSchema.safeParse(payload);
-    throw new Error(
-      parsed.success ? parsed.data.message : "问答服务暂时不可用",
-    );
-  }
-  return QuickAskAnswerSchema.parse(payload);
+  const config = await loadProviderConfig();
+  if (!config) throw new Error("请先点击扩展图标填写豆包和 DeepSeek 密钥。");
+  return answerWithProviders(clip.audioBase64, config, listening.title);
 }
 
 async function askAboutRecentAudio(): Promise<void> {

@@ -1,10 +1,9 @@
 # Project Structure
 
-| Path                 | Role                                         |
-| -------------------- | -------------------------------------------- |
-| `apps/extension`     | WXT Chrome 扩展、离屏音频和页内解释卡片      |
-| `apps/api`           | Hono Cloudflare Worker、豆包和 DeepSeek 调用 |
-| `packages/contracts` | 请求、响应、错误和 UI 状态 Zod 契约          |
-| `docs`               | 产品、架构和部署说明                         |
+| Path                 | Role                                                       |
+| -------------------- | ---------------------------------------------------------- |
+| `apps/extension`     | WXT Chrome 扩展、设置页、离屏音频、Provider 和页内解释卡片 |
+| `packages/contracts` | 解释响应等 Zod 契约                                        |
+| `docs`               | 产品、架构和质量说明                                       |
 
-`.output`、`dist`、`.wrangler`、本地环境文件和所有密钥均不提交。
+`.output`、本地环境文件和密钥均不提交。

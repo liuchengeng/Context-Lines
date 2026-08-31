@@ -1,17 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  CONTRACT_VERSION,
-  HealthResponseSchema,
-  QuickAskAnswerSchema,
-  QuickAskRequestSchema,
-} from "../src/index";
+import { QuickAskAnswerSchema, QuickAskRequestSchema } from "../src/index";
 
 describe("quick ask contracts", () => {
-  it("publishes the current health contract", () => {
-    expect(
-      HealthResponseSchema.parse({ status: "ok", version: CONTRACT_VERSION }),
-    ).toEqual({ status: "ok", version: "0.2.0" });
-  });
   it("accepts a bounded wav clip and rejects excessive duration", () => {
     expect(
       QuickAskRequestSchema.safeParse({

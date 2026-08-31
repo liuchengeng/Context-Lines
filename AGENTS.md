@@ -12,12 +12,12 @@
 ## Project-Specific Rules
 
 - Use pnpm workspace commands from the repository root.
-- Keep browser-to-worker payloads within `packages/contracts`; only the user-triggered recent WAV clip, page title, and origin may be sent.
-- Keep Qwen and DeepSeek credentials in Worker secrets only.
+- Only the user-triggered recent WAV clip may be sent to Doubao; only its transcript and page title may be sent to DeepSeek.
+- Provider keys may persist only in `chrome.storage.local`; never put them in source, build-time environment values, logs, fixtures, or webpages.
 - Do not add persistent session, audio, transcript-history, or browsing-history storage.
-- `apps/extension` targets desktop Chrome 116+ only. Do not broaden host permissions beyond explicit active-tab injection.
+- `apps/extension` targets desktop Chrome 116+ only. Host permissions are limited to the two configured provider API origins.
 - Treat `apps/extension/.output`, `dist`, coverage, Playwright output, `.wrangler`, and local environment files as generated or local artifacts.
-- Remote Supabase/Cloudflare operations, Git remotes, pushes, deployments, and releases require separate user authorization.
+- Git remotes, pushes, deployments, and releases require separate user authorization.
 
 ## Validation
 

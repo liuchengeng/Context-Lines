@@ -1,8 +1,0 @@
-{
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "types": ["@cloudflare/workers-types", "node"],
-    "baseUrl": "."
-  },
-  "include": ["src", "tests", "worker-configuration.d.ts"]
-}
