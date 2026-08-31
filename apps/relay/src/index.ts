@@ -119,6 +119,12 @@ function closeSocket(
   }
 }
 
+export async function normalizeBinaryFrame(
+  data: ArrayBuffer | ArrayBufferView | Blob,
+): Promise<ArrayBuffer | ArrayBufferView> {
+  return data instanceof Blob ? data.arrayBuffer() : data;
+}
+
 async function connectDoubao(clientSocket: WebSocket, env: Env): Promise<void> {
   let upstream: WebSocket | null = null;
   let clientClosed = false;
@@ -179,6 +185,7 @@ async function connectDoubao(clientSocket: WebSocket, env: Env): Promise<void> {
     }
 
     upstream = response.webSocket;
+    let upstreamMessageTail: Promise<void> = Promise.resolve();
     upstream.addEventListener("message", (event) => {
       if (clientSocket.readyState !== 1) return;
       if (typeof event.data === "string") {
@@ -188,7 +195,18 @@ async function connectDoubao(clientSocket: WebSocket, env: Env): Promise<void> {
         closeSocket(upstream!);
         return;
       }
-      clientSocket.send(event.data);
+      const frame = event.data as ArrayBuffer | ArrayBufferView | Blob;
+      upstreamMessageTail = upstreamMessageTail
+        .then(async () => {
+          if (clientSocket.readyState === 1) {
+            clientSocket.send(await normalizeBinaryFrame(frame));
+          }
+        })
+        .catch(() => {
+          sendRelayError(clientSocket, "豆包二进制响应转换失败，请重试。");
+          closeSocket(clientSocket);
+          closeSocket(upstream!);
+        });
     });
     upstream.addEventListener("close", (event) => {
       if (clientSocket.readyState < 2) {

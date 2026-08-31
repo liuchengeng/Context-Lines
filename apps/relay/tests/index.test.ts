@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import worker, {
   DOUBAO_RESOURCE_ID,
+  normalizeBinaryFrame,
   parseRelaySubprotocol,
   type Env,
 } from "../src/index";
@@ -27,6 +28,15 @@ function request(path: string, init?: RequestInit): Request {
 afterEach(() => vi.restoreAllMocks());
 
 describe("relay worker", () => {
+  it("converts Cloudflare Blob WebSocket frames back to binary", async () => {
+    const normalized = await normalizeBinaryFrame(
+      new Blob([new Uint8Array([0x11, 0x93, 0x10, 0x00])]),
+    );
+    expect(Array.from(new Uint8Array(normalized as ArrayBuffer))).toEqual([
+      0x11, 0x93, 0x10, 0x00,
+    ]);
+  });
+
   it("targets the enabled Doubao ASR 2.0 hourly resource", () => {
     expect(DOUBAO_RESOURCE_ID).toBe("volc.seedasr.sauc.duration");
   });
