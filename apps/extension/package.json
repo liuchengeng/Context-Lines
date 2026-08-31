@@ -12,16 +12,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@contextlines/contracts": "workspace:*",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "@contextlines/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/chrome": "^0.1.1",
     "@types/node": "^24.10.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@wxt-dev/module-react": "^1.2.2",
     "typescript": "^5.9.2",
     "vitest": "^4.1.11",
     "wxt": "^0.21.4"

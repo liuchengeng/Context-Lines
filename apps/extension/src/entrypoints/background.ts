@@ -1,18 +1,23 @@
 import {
   QuickAskAnswerSchema,
+  type QuickAskAnswer,
   WorkerErrorSchema,
 } from "@contextlines/contracts";
 
 const LISTENING_KEY = "quickAskListening";
-const VIEW_STATE_KEY = "quickAskViewState";
-const QUESTION_KEY = "quickAskQuestion";
 const OFFSCREEN_PATH = "offscreen.html";
 
 type ListeningState = { tabId: number; title?: string; origin?: string };
-type QuestionState = { windowId: number; tabId: number; shouldResume: boolean };
 type ClipResponse =
   | { ok: true; audioBase64: string; durationMs: number }
   | { ok: false; message: string };
+type OverlayView =
+  | { status: "toggle" }
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "answer"; answer: QuickAskAnswer };
+
+let activeRequestId = 0;
 
 async function getListening(): Promise<ListeningState | null> {
   return (
@@ -38,6 +43,14 @@ async function ensureOffscreen(): Promise<void> {
 
 async function stopListening(): Promise<void> {
   const listening = await getListening();
+  activeRequestId += 1;
+  if (listening) {
+    await updateOverlay(
+      listening.tabId,
+      { status: "toggle" },
+      activeRequestId,
+    ).catch(() => undefined);
+  }
   await chrome.runtime
     .sendMessage({ type: "audio:stop" })
     .catch(() => undefined);
@@ -97,29 +110,101 @@ async function toggleListening(tab: chrome.tabs.Tab): Promise<void> {
   }
 }
 
-async function setVideoPaused(tabId: number, pause: boolean): Promise<boolean> {
+async function updateOverlay(
+  tabId: number,
+  view: OverlayView,
+  requestId: number,
+): Promise<boolean> {
   const [result] = await chrome.scripting.executeScript({
     target: { tabId },
-    func: (shouldPause: boolean) => {
-      const videos = Array.from(document.querySelectorAll("video"));
-      if (shouldPause) {
-        const playing = videos.filter((video) => !video.paused && !video.ended);
-        playing.forEach((video) => {
-          video.dataset.contextlinesWasPlaying = "true";
-          video.pause();
-        });
-        return playing.length > 0;
+    func: (nextView: OverlayView, nextRequestId: number) => {
+      const hostId = "contextlines-quick-ask";
+      const existing = document.getElementById(hostId);
+      if (nextView.status === "toggle") {
+        existing?.remove();
+        return Boolean(existing);
       }
-      const resumable = videos.filter(
-        (video) => video.dataset.contextlinesWasPlaying === "true",
-      );
-      resumable.forEach((video) => {
-        delete video.dataset.contextlinesWasPlaying;
-        void video.play();
+
+      if (
+        nextView.status !== "loading" &&
+        (!existing || existing.dataset.requestId !== String(nextRequestId))
+      ) {
+        return false;
+      }
+
+      const host = existing ?? document.createElement("div");
+      host.id = hostId;
+      host.dataset.requestId = String(nextRequestId);
+      Object.assign(host.style, {
+        all: "initial",
+        position: "fixed",
+        zIndex: "2147483647",
+        top: "16px",
+        right: "16px",
+        width: "min(360px, calc(100vw - 32px))",
+        pointerEvents: "auto",
       });
-      return resumable.length > 0;
+      if (!host.shadowRoot) host.attachShadow({ mode: "open" });
+      const shadow = host.shadowRoot;
+      if (!shadow) return false;
+      shadow.replaceChildren();
+
+      const style = document.createElement("style");
+      style.textContent = `
+        :host { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        .card { position: relative; max-height: 44vh; overflow: auto; padding: 14px 40px 14px 15px; border: 1px solid rgba(255,255,255,.17); border-radius: 10px; background: rgba(9,10,12,.96); color: #f5f5f5; box-shadow: 0 8px 28px rgba(0,0,0,.38); font: 13px/1.55 Inter,"Segoe UI",system-ui,sans-serif; backdrop-filter: blur(10px); }
+        .close { position: absolute; top: 7px; right: 7px; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #9b9da2; font: 20px/1 system-ui; cursor: pointer; }
+        .close:hover { background: #26282c; color: #fff; }
+        .label { margin: 0 0 5px; color: #8f9297; font-size: 11px; }
+        h2 { margin: 0 0 11px; color: #fff; font-size: 16px; line-height: 1.42; }
+        .phrase { margin: 0 0 5px; color: #fff; font-weight: 700; }
+        p { margin: 0; color: #d5d6d8; }
+        .detail { margin-top: 10px; padding-top: 10px; border-top: 1px solid #292b2e; color: #b9bbc0; }
+        .loading { display: flex; align-items: center; min-height: 32px; color: #c8c9cc; }
+        .dot { width: 7px; height: 7px; margin-right: 9px; border-radius: 50%; background: #fff; animation: pulse .8s ease-in-out infinite alternate; }
+        .error { color: #ffb1b1; }
+        @keyframes pulse { to { opacity: .25; } }
+      `;
+      const card = document.createElement("section");
+      card.className = "card";
+      const close = document.createElement("button");
+      close.className = "close";
+      close.type = "button";
+      close.ariaLabel = "关闭解释";
+      close.textContent = "×";
+      close.addEventListener("click", () => host.remove());
+      card.append(close);
+
+      const addText = (tag: "p" | "h2", text: string, className?: string) => {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        element.textContent = text;
+        card.append(element);
+      };
+      if (nextView.status === "loading") {
+        const loading = document.createElement("div");
+        loading.className = "loading";
+        const dot = document.createElement("span");
+        dot.className = "dot";
+        loading.append(dot, "正在解释刚才听到的英语…");
+        card.append(loading);
+      } else if (nextView.status === "error") {
+        addText("p", nextView.message, "error");
+      } else {
+        addText("p", "刚才听到", "label");
+        addText("h2", nextView.answer.transcript);
+        addText("p", nextView.answer.phrase, "phrase");
+        addText("p", nextView.answer.meaning_zh);
+        addText("p", nextView.answer.context_zh, "detail");
+        addText("p", nextView.answer.usage_zh, "detail");
+      }
+      shadow.append(style, card);
+      const container = document.fullscreenElement ?? document.documentElement;
+      if (host.parentElement !== container) container.append(host);
+      return true;
     },
-    args: [pause],
+    args: [view, requestId],
   });
   return Boolean(result?.result);
 }
@@ -168,69 +253,50 @@ async function callQuickAsk(
   return QuickAskAnswerSchema.parse(payload);
 }
 
-async function openAnswerWindow(
-  tabId: number,
-  shouldResume: boolean,
-): Promise<void> {
-  await chrome.storage.session.set({ [VIEW_STATE_KEY]: { status: "loading" } });
-  const created = await chrome.windows.create({
-    url: chrome.runtime.getURL("answer.html"),
-    type: "popup",
-    width: 430,
-    height: 520,
-    focused: true,
-  });
-  if (!created || created.id === undefined) throw new Error("无法打开解释窗口");
-  await chrome.storage.session.set({
-    [QUESTION_KEY]: {
-      windowId: created.id,
-      tabId,
-      shouldResume,
-    } satisfies QuestionState,
-  });
-}
-
 async function askAboutRecentAudio(): Promise<void> {
-  if ((await chrome.storage.session.get(QUESTION_KEY))[QUESTION_KEY]) return;
   const listening = await getListening();
-  if (!listening) {
-    const tabId = (
-      await chrome.tabs.query({ active: true, currentWindow: true })
-    )[0]?.id;
-    if (!tabId) return;
-    await openAnswerWindow(tabId, false);
-    await chrome.storage.session.set({
-      [VIEW_STATE_KEY]: {
-        status: "error",
-        message: "先点击扩展图标开始监听，再按 Alt+Q。",
-      },
-    });
+  const tabId =
+    listening?.tabId ??
+    (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.id;
+  if (!tabId) return;
+
+  if (await updateOverlay(tabId, { status: "toggle" }, activeRequestId)) {
+    activeRequestId += 1;
     return;
   }
-  let shouldResume = false;
-  try {
-    shouldResume = await setVideoPaused(listening.tabId, true);
-  } catch {
-    /* capture remains usable */
+
+  const requestId = ++activeRequestId;
+  if (!listening) {
+    await updateOverlay(tabId, { status: "loading" }, requestId);
+    await updateOverlay(
+      tabId,
+      { status: "error", message: "先点击扩展图标开始监听，再按 Alt+Q。" },
+      requestId,
+    );
+    return;
   }
-  await openAnswerWindow(listening.tabId, shouldResume);
+  await updateOverlay(tabId, { status: "loading" }, requestId);
   try {
     const clip = (await chrome.runtime.sendMessage({
       type: "audio:get-clip",
     })) as ClipResponse;
     if (!clip.ok) throw new Error(clip.message);
     const answer = await callQuickAsk(listening, clip);
-    await chrome.storage.session.set({
-      [VIEW_STATE_KEY]: { status: "answer", answer },
-    });
+    if (requestId === activeRequestId) {
+      await updateOverlay(tabId, { status: "answer", answer }, requestId);
+    }
   } catch (error) {
-    await chrome.storage.session.set({
-      [VIEW_STATE_KEY]: {
-        status: "error",
-        message:
-          error instanceof Error ? error.message : "没有成功识别刚才的声音",
-      },
-    });
+    if (requestId === activeRequestId) {
+      await updateOverlay(
+        tabId,
+        {
+          status: "error",
+          message:
+            error instanceof Error ? error.message : "没有成功识别刚才的声音",
+        },
+        requestId,
+      );
+    }
   }
 }
 
@@ -241,15 +307,6 @@ export default defineBackground(() => {
   });
   chrome.runtime.onMessage.addListener((message: { type?: string }) => {
     if (message.type === "audio:ended") void stopListening();
-  });
-  chrome.windows.onRemoved.addListener((windowId) => {
-    void chrome.storage.session.get(QUESTION_KEY).then(async (stored) => {
-      const question = stored[QUESTION_KEY] as QuestionState | undefined;
-      if (!question || question.windowId !== windowId) return;
-      await chrome.storage.session.remove([QUESTION_KEY, VIEW_STATE_KEY]);
-      if (question.shouldResume)
-        await setVideoPaused(question.tabId, false).catch(() => undefined);
-    });
   });
   chrome.tabs.onRemoved.addListener((tabId) => {
     void getListening().then((state) => {

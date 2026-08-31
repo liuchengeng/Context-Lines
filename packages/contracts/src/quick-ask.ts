@@ -19,15 +19,3 @@ export const QuickAskAnswerSchema = z.object({
 });
 
 export type QuickAskAnswer = z.infer<typeof QuickAskAnswerSchema>;
-
-export const QuickAskViewStateSchema = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("idle") }),
-  z.object({ status: z.literal("loading") }),
-  z.object({ status: z.literal("answer"), answer: QuickAskAnswerSchema }),
-  z.object({
-    status: z.literal("error"),
-    message: z.string().min(1).max(240),
-  }),
-]);
-
-export type QuickAskViewState = z.infer<typeof QuickAskViewStateSchema>;

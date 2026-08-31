@@ -18,7 +18,6 @@ function originOf(value: string): string | null {
 const apiOrigin = originOf(apiBaseUrl);
 
 export default defineConfig({
-  modules: ["@wxt-dev/module-react"],
   srcDir: "src",
   manifest: {
     name: "ContextLines Quick Ask",
