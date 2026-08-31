@@ -118,7 +118,9 @@ describe("direct provider", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const wav = new Uint8Array(encodeMonoWav(new Float32Array(320), 16_000));
+    const wav = new Uint8Array(
+      encodeMonoWav(new Float32Array(320).fill(0.2), 16_000),
+    );
     const answer = await answerWithProviders(
       Buffer.from(wav).toString("base64"),
       {

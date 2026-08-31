@@ -388,6 +388,51 @@ function formatHandshakeError(diagnostic: HandshakeDiagnostic): string {
   return `${parts.join("；")}。`;
 }
 
+function measurePcmLevel(pcm: Uint8Array<ArrayBuffer>): {
+  peak: number;
+  rms: number;
+} {
+  const view = new DataView(pcm.buffer, pcm.byteOffset, pcm.byteLength);
+  let peak = 0;
+  let squares = 0;
+  const samples = Math.floor(pcm.byteLength / 2);
+  for (let offset = 0; offset + 1 < pcm.byteLength; offset += 2) {
+    const value = view.getInt16(offset, true) / 0x8000;
+    const absolute = Math.abs(value);
+    if (absolute > peak) peak = absolute;
+    squares += value * value;
+  }
+  return { peak, rms: samples ? Math.sqrt(squares / samples) : 0 };
+}
+
+function summarizeDoubaoPayload(value: unknown): string {
+  if (!value || typeof value !== "object") return String(value ?? "无响应");
+  const root = value as Record<string, unknown>;
+  const payload =
+    root.payload_msg && typeof root.payload_msg === "object"
+      ? (root.payload_msg as Record<string, unknown>)
+      : root;
+  const result =
+    payload.result && typeof payload.result === "object"
+      ? (payload.result as Record<string, unknown>)
+      : undefined;
+  const audioInfo =
+    payload.audio_info && typeof payload.audio_info === "object"
+      ? (payload.audio_info as Record<string, unknown>)
+      : undefined;
+  return JSON.stringify({
+    code: root.code,
+    message: root.message,
+    duration: audioInfo?.duration,
+    text: result?.text,
+    utterances: Array.isArray(result?.utterances)
+      ? result.utterances.length
+      : undefined,
+    payload_keys: Object.keys(payload),
+    result_keys: result ? Object.keys(result) : [],
+  }).slice(0, 500);
+}
+
 async function transcribeOnce(
   audioBase64: string,
   appId: string,
@@ -395,6 +440,12 @@ async function transcribeOnce(
 ): Promise<string> {
   const pcm = extractPcmFromWav(decodeBase64(audioBase64));
   if (pcm.byteLength === 0) throw new Error("刚才没有可识别的声音。");
+  const audioLevel = measurePcmLevel(pcm);
+  if (audioLevel.peak < 0.001) {
+    throw new Error(
+      `扩展捕获到的标签页音频接近静音（峰值 ${audioLevel.peak.toFixed(5)}）。请确认视频正在播放且标签页没有静音。`,
+    );
+  }
   const requestId = crypto.randomUUID();
   await installDoubaoHeaders(appId, accessToken, requestId);
   const handshake = observeDoubaoHandshake();
@@ -404,6 +455,7 @@ async function transcribeOnce(
       const socket = new WebSocket(DOUBAO_URL);
       socket.binaryType = "arraybuffer";
       let latestTranscript = "";
+      let lastPayload: unknown;
       let settled = false;
       let messageTail: Promise<void> = Promise.resolve();
       const finish = (error?: Error) => {
@@ -412,7 +464,12 @@ async function transcribeOnce(
         clearTimeout(timeout);
         if (error) reject(error);
         else if (latestTranscript) resolve(latestTranscript);
-        else reject(new Error("刚才没有识别到清晰英语。"));
+        else
+          reject(
+            new Error(
+              `豆包返回了空文本（音频峰值 ${audioLevel.peak.toFixed(3)}，RMS ${audioLevel.rms.toFixed(3)}；响应 ${summarizeDoubaoPayload(lastPayload)}）。`,
+            ),
+          );
       };
       const timeout = setTimeout(() => {
         socket.close();
@@ -447,6 +504,7 @@ async function transcribeOnce(
         messageTail = messageTail
           .then(async () => {
             const payload = await parseDoubaoPacket(event.data);
+            if (payload !== null) lastPayload = payload;
             const transcript = extractTranscript(payload);
             if (transcript) latestTranscript = transcript;
             const isLast = nestedRecord(payload, "is_last_package") === true;
