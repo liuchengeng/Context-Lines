@@ -8,6 +8,7 @@ export default defineConfig({
     minimum_chrome_version: "116",
     permissions: [
       "activeTab",
+      "declarativeNetRequestWithHostAccess",
       "offscreen",
       "scripting",
       "storage",
@@ -26,7 +27,7 @@ export default defineConfig({
     },
     content_security_policy: {
       extension_pages:
-        "script-src 'self'; object-src 'self'; connect-src 'self' https://openspeech.bytedance.com https://api.deepseek.com",
+        "script-src 'self'; object-src 'self'; connect-src 'self' wss://openspeech.bytedance.com https://api.deepseek.com",
     },
   },
 });

@@ -1,6 +1,6 @@
 # ContextLines Quick Ask
 
-一个个人使用的 Chrome 116+ 扩展：在本机内存中保留当前视频最近约 10 秒声音，按 `Alt+Q` 后才调用豆包极速语音识别与 DeepSeek 中文解释。它不会暂停视频或退出全屏。
+一个个人使用的 Chrome 116+ 扩展：在本机内存中保留当前视频最近约 10 秒声音，按 `Alt+Q` 后才调用豆包流式语音识别模型 2.0 小时版与 DeepSeek 中文解释。它不会暂停视频或退出全屏。
 
 ## 使用
 
@@ -17,7 +17,7 @@ corepack pnpm dev
 4. 进入全屏，按 `Alt+Q`；解释显示在右上角。
 5. 点击 `×` 或再次按 `Alt+Q` 关闭；再次点击扩展图标停止监听。
 
-豆包账号需要开通录音文件极速版识别资源 `volc.bigasr.auc_turbo`。如果快捷键无效，在 `chrome://extensions/shortcuts` 手动设置。
+豆包账号需要开通流式语音识别模型 2.0 小时版资源 `volc.seedasr.sauc.duration`。这里的“小时版”按实际发送的音频时长计量，不是每次调用扣一整小时。如果快捷键无效，在 `chrome://extensions/shortcuts` 手动设置。
 
 ## 隐私与密钥
 
