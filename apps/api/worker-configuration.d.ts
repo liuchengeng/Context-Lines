@@ -1,0 +1,10 @@
+interface Env {
+  ALLOWED_EMAIL: string;
+  ALLOWED_EXTENSION_ID: string;
+  OPENAI_API_KEY: string;
+  OPENAI_TRANSCRIPTION_MODEL: string;
+  OPENAI_QUICK_ANALYSIS_MODEL: string;
+  OPENAI_DEEP_ANALYSIS_MODEL: string;
+  SUPABASE_URL: string;
+  SUPABASE_ANON_KEY: string;
+}

@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build and generated output
+dist/
+build/
+coverage/
+.output/
+.wxt/
+.wrangler/
+playwright-report/
+test-results/
+artifacts/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.dev.vars
+
+# Logs and caches
+*.log
+.cache/
+.turbo/
+.vite/
+.eslintcache
+
+# Local scratch
+.tmp/
+tmp/
+output/
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

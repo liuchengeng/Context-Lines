@@ -1,0 +1,27 @@
+{
+  "name": "contextlines",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @contextlines/extension dev",
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r --if-present test",
+    "test:db": "pnpm --filter @contextlines/api test:db",
+    "test:e2e": "playwright test",
+    "design:lint": "designmd lint DESIGN.md"
+  },
+  "devDependencies": {
+    "@google/design.md": "^0.4.0",
+    "@playwright/test": "^1.55.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2"
+  }
+}
