@@ -16,6 +16,7 @@
     "test": "pnpm -r --if-present test",
     "test:db": "pnpm --filter @contextlines/api test:db",
     "test:e2e": "playwright test",
+    "eval": "pnpm --filter @contextlines/evals test",
     "design:lint": "designmd lint DESIGN.md"
   },
   "devDependencies": {

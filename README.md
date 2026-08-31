@@ -31,6 +31,9 @@ pnpm format:check
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:db
+pnpm eval
+pnpm test:e2e
 pnpm build
 ```
 
@@ -45,6 +48,8 @@ pnpm build
 - 技术架构：[docs/architecture.md](./docs/architecture.md)
 - 仓库结构：[docs/project-structure.md](./docs/project-structure.md)
 - UI 设计系统：[DESIGN.md](./DESIGN.md)
+- 质量报告：[docs/quality-report.md](./docs/quality-report.md)
+- 部署预检：[docs/deployment-preflight.md](./docs/deployment-preflight.md)
 - Agent 规则：[AGENTS.md](./AGENTS.md)
 
 ## External Operations
