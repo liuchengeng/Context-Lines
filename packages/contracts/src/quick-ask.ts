@@ -16,7 +16,7 @@ export const QuickAskExplanationSchema = z.object({
 export const QuickAskAnswerSchema = z.object({
   transcript: z.string().trim().min(1).max(500),
   translation_zh: z.string().trim().min(1).max(500),
-  explanations: z.array(QuickAskExplanationSchema).min(1).max(3),
+  explanations: z.array(QuickAskExplanationSchema).max(3),
 });
 
 export type QuickAskAnswer = z.infer<typeof QuickAskAnswerSchema>;

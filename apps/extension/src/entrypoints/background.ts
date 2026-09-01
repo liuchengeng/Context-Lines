@@ -1,9 +1,14 @@
-import type { QuickAskAnswer } from "@contextlines/contracts";
+import type {
+  QuickAskAnswer,
+  SaveVocabularyItem,
+} from "@contextlines/contracts";
 import {
   answerWithProviders,
   clearProviderMemoryCache,
   loadProviderConfig,
 } from "../lib/direct-provider";
+import { userFacingErrorMessage } from "../lib/user-facing-error";
+import { saveVocabularyItem, vocabularyKindForTerm } from "../lib/vocabulary";
 
 const LISTENING_KEY = "quickAskListening";
 const OFFSCREEN_PATH = "offscreen.html";
@@ -18,6 +23,11 @@ type OverlayView =
   | { status: "transcript"; transcript: string }
   | { status: "error"; message: string }
   | { status: "answer"; answer: QuickAskAnswer };
+type ExtensionMessage =
+  | { type: "audio:ended" }
+  | { type: "vocabulary:save"; item: SaveVocabularyItem }
+  | { type: "vocabulary:open" };
+type SaveVocabularyResponse = { ok: true } | { ok: false; message: string };
 
 let activeRequestId = 0;
 
@@ -105,8 +115,7 @@ async function toggleListening(tab: chrome.tabs.Tab): Promise<void> {
   try {
     await startListening(tab);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "无法监听当前标签页";
+    const message = userFacingErrorMessage(error, "无法监听当前标签页");
     await chrome.action.setBadgeBackgroundColor({ color: "#b84a4a" });
     await chrome.action.setBadgeText({ tabId: tab.id, text: "!" });
     await chrome.action.setTitle({ tabId: tab.id, title: message });
@@ -210,8 +219,8 @@ async function updateOverlay(
         .label:first-of-type { margin-top: 0; }
         .paused { margin: 0 0 9px; color: #e2bd72; font-size: 11px; }
         p { margin: 0; color: #d5d6d8; }
-        .sentence { color: #f3f4f6; font-size: 17px; font-weight: 600; line-height: 1.5; }
-        .translation { color: #d8dee8; font-size: 14px; line-height: 1.5; }
+        .sentence { color: #d8dadd; font-size: 15px; font-weight: 550; line-height: 1.5; }
+        .translation { color: #f3f4f6; font-size: 16px; font-weight: 600; line-height: 1.5; }
         .highlight { padding: 1px 2px; border-radius: 3px; font-weight: 760; }
         .tone-0 { color: #9bc1ff; }
         .tone-1 { color: #d7adff; }
@@ -220,10 +229,15 @@ async function updateOverlay(
         mark.tone-1 { background: rgba(168,102,225,.18); }
         mark.tone-2 { background: rgba(232,145,63,.18); }
         .explanations { margin-top: 2px; }
-        .explanation { display: grid; grid-template-columns: minmax(0,max-content) minmax(0,1fr); gap: 8px; align-items: baseline; padding: 7px 0; border-top: 1px solid #292b2e; }
+        .explanation { display: grid; grid-template-columns: minmax(0,max-content) minmax(0,1fr) auto; gap: 8px; align-items: baseline; padding: 7px 0; border-top: 1px solid #292b2e; }
         .explanation:first-child { border-top: 0; }
         .selected-phrase { font-weight: 720; }
         .brief-meaning { color: #d5d6d8; }
+        .save { min-width: 42px; height: 24px; padding: 0 7px; border: 1px solid #3b3e43; border-radius: 6px; background: transparent; color: #aeb1b6; font: 600 10px/1 Inter,"Segoe UI",system-ui,sans-serif; cursor: pointer; }
+        .save:hover { border-color: #646970; color: #fff; }
+        .save.saved { border-color: #315f48; color: #72d69a; cursor: default; }
+        .wordbook { display: block; margin: 5px 0 0 auto; padding: 2px 0; border: 0; background: transparent; color: #8bb8ff; font: 600 11px/1.4 Inter,"Segoe UI",system-ui,sans-serif; cursor: pointer; }
+        .wordbook:hover { color: #b9d5ff; }
         .loading { display: flex; align-items: center; min-height: 32px; color: #c8c9cc; }
         .dot { width: 7px; height: 7px; margin-right: 9px; border-radius: 50%; background: #8bb8ff; animation: pulse .8s ease-in-out infinite alternate; }
         .error { color: #ffb1b1; }
@@ -303,19 +317,19 @@ async function updateOverlay(
         loading.append(dot, "正在识别最近的有效语音…");
         card.append(loading);
       } else if (nextView.status === "transcript") {
-        addText("p", "识别到的完整英文", "label");
+        addText("p", "识别到的英文片段", "label");
         addText("p", nextView.transcript, "sentence");
         const loading = document.createElement("div");
         loading.className = "loading";
         const dot = document.createElement("span");
         dot.className = "dot";
-        loading.append(dot, "正在生成整句中文和短语…");
+        loading.append(dot, "正在生成中文和短语…");
         card.append(loading);
       } else if (nextView.status === "error") {
         addText("p", "处理没有完成", "label");
         addText("p", nextView.message, "error");
       } else {
-        addText("p", "识别到的完整英文", "label");
+        addText("p", "识别到的英文片段", "label");
         const sentence = document.createElement("p");
         sentence.className = "sentence";
         appendHighlightedTranscript(
@@ -325,25 +339,70 @@ async function updateOverlay(
         );
         card.append(sentence);
 
-        addText("p", "整句中文", "label");
+        addText("p", "中文理解", "label");
         addText("p", nextView.answer.translation_zh, "translation");
 
-        addText("p", "选出的表达", "label");
-        const explanations = document.createElement("div");
-        explanations.className = "explanations";
-        nextView.answer.explanations.forEach((explanation, tone) => {
-          const row = document.createElement("div");
-          row.className = "explanation";
-          const phrase = document.createElement("span");
-          phrase.className = `selected-phrase tone-${tone}`;
-          phrase.textContent = explanation.phrase;
-          const meaning = document.createElement("span");
-          meaning.className = "brief-meaning";
-          meaning.textContent = `→ ${explanation.meaning_zh}`;
-          row.append(phrase, meaning);
-          explanations.append(row);
-        });
-        card.append(explanations);
+        if (nextView.answer.explanations.length > 0) {
+          addText("p", "单词和短语", "label");
+          const explanations = document.createElement("div");
+          explanations.className = "explanations";
+          nextView.answer.explanations.forEach((explanation, tone) => {
+            const row = document.createElement("div");
+            row.className = "explanation";
+            const phrase = document.createElement("span");
+            phrase.className = `selected-phrase tone-${tone}`;
+            phrase.textContent = explanation.phrase;
+            const meaning = document.createElement("span");
+            meaning.className = "brief-meaning";
+            meaning.textContent = `→ ${explanation.meaning_zh}`;
+            const save = document.createElement("button");
+            save.className = "save";
+            save.type = "button";
+            save.textContent = "收藏";
+            save.ariaLabel = `收藏 ${explanation.phrase}`;
+            save.addEventListener("click", () => {
+              save.disabled = true;
+              save.textContent = "保存中";
+              void chrome.runtime
+                .sendMessage({
+                  type: "vocabulary:save",
+                  item: {
+                    term: explanation.phrase,
+                    meaning_zh: explanation.meaning_zh,
+                    kind: /\s/.test(explanation.phrase.trim())
+                      ? "phrase"
+                      : "word",
+                  },
+                })
+                .then((response: SaveVocabularyResponse | undefined) => {
+                  if (response?.ok) {
+                    save.textContent = "已收藏";
+                    save.classList.add("saved");
+                    return;
+                  }
+                  save.disabled = false;
+                  save.textContent = "重试";
+                  save.title = response?.message ?? "没有成功收藏，请重试。";
+                })
+                .catch(() => {
+                  save.disabled = false;
+                  save.textContent = "重试";
+                  save.title = "没有成功收藏，请重试。";
+                });
+            });
+            row.append(phrase, meaning, save);
+            explanations.append(row);
+          });
+          card.append(explanations);
+          const wordbook = document.createElement("button");
+          wordbook.className = "wordbook";
+          wordbook.type = "button";
+          wordbook.textContent = "查看词单";
+          wordbook.addEventListener("click", () => {
+            void chrome.runtime.sendMessage({ type: "vocabulary:open" });
+          });
+          card.append(wordbook);
+        }
       }
       if (nextView.status !== "loading") {
         const resume = document.createElement("button");
@@ -429,8 +488,10 @@ async function askAboutRecentAudio(): Promise<void> {
         tabId,
         {
           status: "error",
-          message:
-            error instanceof Error ? error.message : "没有成功识别刚才的声音",
+          message: userFacingErrorMessage(
+            error,
+            "没有成功识别刚才的声音，请稍后重试。",
+          ),
         },
         requestId,
       );
@@ -443,9 +504,42 @@ export default defineBackground(() => {
   chrome.commands.onCommand.addListener((command) => {
     if (command === "quick-ask") void askAboutRecentAudio();
   });
-  chrome.runtime.onMessage.addListener((message: { type?: string }) => {
-    if (message.type === "audio:ended") void stopListening();
-  });
+  chrome.runtime.onMessage.addListener(
+    (
+      message: ExtensionMessage,
+      _sender,
+      sendResponse: (response: SaveVocabularyResponse) => void,
+    ) => {
+      if (message.type === "audio:ended") {
+        void stopListening();
+        return;
+      }
+      if (message.type === "vocabulary:open") {
+        void chrome.tabs.create({
+          url: chrome.runtime.getURL("vocabulary.html"),
+        });
+        return;
+      }
+      if (message.type === "vocabulary:save") {
+        const item = {
+          ...message.item,
+          kind: vocabularyKindForTerm(message.item.term),
+        } satisfies SaveVocabularyItem;
+        void saveVocabularyItem(item)
+          .then(() => sendResponse({ ok: true }))
+          .catch((error: unknown) =>
+            sendResponse({
+              ok: false,
+              message: userFacingErrorMessage(
+                error,
+                "没有成功收藏，请稍后重试。",
+              ),
+            }),
+          );
+        return true;
+      }
+    },
+  );
   chrome.tabs.onRemoved.addListener((tabId) => {
     void getListening().then((state) => {
       if (state?.tabId === tabId) return stopListening();

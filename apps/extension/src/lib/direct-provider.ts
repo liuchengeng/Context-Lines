@@ -97,7 +97,7 @@ export function relayWebSocketUrl(baseUrl: string): string {
   return url.toString();
 }
 
-function relayHttpUrl(baseUrl: string, path: string): string {
+export function relayHttpUrl(baseUrl: string, path: string): string {
   const url = new URL(normalizeRelayBaseUrl(baseUrl));
   url.pathname = `${url.pathname}${path}`.replace(/\/+/g, "/");
   return url.toString();

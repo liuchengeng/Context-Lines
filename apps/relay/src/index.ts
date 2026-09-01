@@ -1,4 +1,9 @@
-import { QuickAskAnswerSchema } from "@contextlines/contracts";
+import {
+  QuickAskAnswerSchema,
+  QuickAskExplanationSchema,
+  SaveVocabularyItemSchema,
+  VocabularyItemSchema,
+} from "@contextlines/contracts";
 import { z } from "zod";
 
 const DOUBAO_URL =
@@ -14,6 +19,7 @@ export interface Env {
   DOUBAO_ACCESS_TOKEN: string;
   DEEPSEEK_API_KEY: string;
   RELAY_TOKEN: string;
+  VOCAB_DB?: D1Database;
 }
 
 const ExplainInputSchema = z.object({
@@ -26,10 +32,20 @@ const DeepSeekResponseSchema = z.object({
     .min(1),
 });
 
-const DeepSeekExplanationSchema = QuickAskAnswerSchema.pick({
+const DeepSeekTranslationSchema = QuickAskAnswerSchema.pick({
   translation_zh: true,
-  explanations: true,
-});
+}).extend({ explanations: z.unknown().optional() });
+
+const VocabularyIdSchema = z.string().uuid();
+
+function validDeepSeekExplanations(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => QuickAskExplanationSchema.safeParse(item))
+    .filter((result) => result.success)
+    .map((result) => result.data)
+    .slice(0, 3);
+}
 
 function isExtensionOrigin(origin: string | null): boolean {
   if (!origin) return true;
@@ -47,7 +63,7 @@ function corsHeaders(request: Request): HeadersInit {
     ? {
         "Access-Control-Allow-Origin": origin,
         "Access-Control-Allow-Headers": "Authorization, Content-Type",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
         Vary: "Origin",
       }
     : {};
@@ -75,6 +91,145 @@ function errorResponse(
     { code, message, request_id: crypto.randomUUID(), retryable },
     status,
   );
+}
+
+function normalizedVocabularyTerm(term: string): string {
+  return term.toLocaleLowerCase("en-US").replace(/\s+/g, " ").trim();
+}
+
+function displayVocabularyTerm(term: string): string {
+  return term.replace(/\s+/g, " ").trim();
+}
+
+function requireVocabularyDb(
+  request: Request,
+  env: Env,
+): D1Database | Response {
+  return (
+    env.VOCAB_DB ??
+    errorResponse(
+      request,
+      503,
+      "vocabulary_not_configured",
+      "词单尚未启用，请先为 Worker 配置 D1 数据库。",
+    )
+  );
+}
+
+async function handleVocabularyList(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const database = requireVocabularyDb(request, env);
+  if (database instanceof Response) return database;
+  try {
+    const result = await database
+      .prepare(
+        "SELECT id, term, meaning_zh, kind, created_at, updated_at FROM vocabulary_items ORDER BY updated_at DESC LIMIT 500",
+      )
+      .all();
+    const parsed = VocabularyItemSchema.array().safeParse(result.results);
+    return parsed.success
+      ? json(request, { items: parsed.data })
+      : errorResponse(
+          request,
+          500,
+          "invalid_vocabulary_data",
+          "词单数据格式异常，请检查数据库迁移。",
+        );
+  } catch {
+    return errorResponse(
+      request,
+      503,
+      "vocabulary_unavailable",
+      "词单暂时无法读取，请稍后重试。",
+      true,
+    );
+  }
+}
+
+async function handleVocabularySave(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const database = requireVocabularyDb(request, env);
+  if (database instanceof Response) return database;
+  const input = SaveVocabularyItemSchema.safeParse(
+    await request.json().catch(() => null),
+  );
+  if (!input.success) {
+    return errorResponse(request, 400, "invalid_request", "收藏内容无效。");
+  }
+  const now = new Date().toISOString();
+  const term = displayVocabularyTerm(input.data.term);
+  const normalizedTerm = normalizedVocabularyTerm(term);
+  try {
+    await database
+      .prepare(
+        "INSERT INTO vocabulary_items (id, term, normalized_term, meaning_zh, kind, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(normalized_term) DO UPDATE SET term = excluded.term, meaning_zh = excluded.meaning_zh, kind = excluded.kind, updated_at = excluded.updated_at",
+      )
+      .bind(
+        crypto.randomUUID(),
+        term,
+        normalizedTerm,
+        input.data.meaning_zh,
+        input.data.kind,
+        now,
+        now,
+      )
+      .run();
+    const saved = await database
+      .prepare(
+        "SELECT id, term, meaning_zh, kind, created_at, updated_at FROM vocabulary_items WHERE normalized_term = ?",
+      )
+      .bind(normalizedTerm)
+      .first();
+    const parsed = VocabularyItemSchema.safeParse(saved);
+    return parsed.success
+      ? json(request, { item: parsed.data })
+      : errorResponse(
+          request,
+          500,
+          "vocabulary_save_failed",
+          "词条没有成功保存，请重试。",
+          true,
+        );
+  } catch {
+    return errorResponse(
+      request,
+      503,
+      "vocabulary_unavailable",
+      "词单暂时无法保存，请稍后重试。",
+      true,
+    );
+  }
+}
+
+async function handleVocabularyDelete(
+  request: Request,
+  env: Env,
+  id: string,
+): Promise<Response> {
+  const database = requireVocabularyDb(request, env);
+  if (database instanceof Response) return database;
+  if (!VocabularyIdSchema.safeParse(id).success) {
+    return errorResponse(request, 400, "invalid_request", "词条编号无效。");
+  }
+  try {
+    await database
+      .prepare("DELETE FROM vocabulary_items WHERE id = ?")
+      .bind(id)
+      .run();
+    return json(request, { ok: true });
+  } catch {
+    return errorResponse(
+      request,
+      503,
+      "vocabulary_unavailable",
+      "词条暂时无法删除，请稍后重试。",
+      true,
+    );
+  }
 }
 
 function hasBearerToken(request: Request, env: Env): boolean {
@@ -329,7 +484,7 @@ async function handleExplain(request: Request, env: Env): Promise<Response> {
           {
             role: "system",
             content:
-              '翻译英文影视字幕并返回 JSON：{"translation_zh":"完整自然中文，不加说明","explanations":[{"phrase":"原文连续片段","meaning_zh":"最多18字中文"}]}。explanations 选 1 至 3 个真正需解释的俚语、习语、短语动词或不可直译表达；不够勿凑，片段不得重叠。勿添加语境、用法、例句或剧情。',
+              '翻译英文影视字幕并返回 JSON：{"translation_zh":"自然中文，不加说明","explanations":[{"phrase":"原文中的单词或连续片段","meaning_zh":"最多18字中文"}]}。explanations 最多选 3 个真正影响理解、值得记忆的单词、俚语、习语、短语动词或不可直译表达；没有合适内容时返回空数组，片段不得重叠。勿添加语境、用法、例句或剧情。',
           },
           {
             role: "user",
@@ -386,20 +541,20 @@ async function handleExplain(request: Request, env: Env): Promise<Response> {
       true,
     );
   }
-  const explanations = DeepSeekExplanationSchema.safeParse(decoded);
-  if (!explanations.success) {
+  const translation = DeepSeekTranslationSchema.safeParse(decoded);
+  if (!translation.success) {
     return errorResponse(
       request,
       502,
       "invalid_deepseek_response",
-      "DeepSeek 返回的解释缺少必要内容。",
+      "DeepSeek 没有返回有效中文，请重试。",
       true,
     );
   }
   return json(request, {
     transcript: input.transcript,
-    translation_zh: explanations.data.translation_zh,
-    explanations: explanations.data.explanations,
+    translation_zh: translation.data.translation_zh,
+    explanations: validDeepSeekExplanations(translation.data.explanations),
   });
 }
 
@@ -449,6 +604,22 @@ export default {
     }
     if (request.method === "POST" && url.pathname === "/v1/explain") {
       return handleExplain(request, env);
+    }
+    if (request.method === "GET" && url.pathname === "/v1/vocabulary") {
+      return handleVocabularyList(request, env);
+    }
+    if (request.method === "POST" && url.pathname === "/v1/vocabulary") {
+      return handleVocabularySave(request, env);
+    }
+    if (
+      request.method === "DELETE" &&
+      url.pathname.startsWith("/v1/vocabulary/")
+    ) {
+      return handleVocabularyDelete(
+        request,
+        env,
+        url.pathname.slice("/v1/vocabulary/".length),
+      );
     }
     return errorResponse(request, 404, "not_found", "接口不存在。");
   },

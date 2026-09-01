@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>我的词单</title>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p class="eyebrow">CONTEXTLINES</p>
+          <h1>我的词单</h1>
+          <p class="intro">这里只保存你主动收藏的单词和短语。</p>
+        </div>
+        <button id="settings" type="button">连接设置</button>
+      </header>
+      <p id="status" role="status">正在读取词单…</p>
+      <section id="list" aria-live="polite"></section>
+    </main>
+    <script type="module" src="./vocabulary/main.ts"></script>
+  </body>
+</html>

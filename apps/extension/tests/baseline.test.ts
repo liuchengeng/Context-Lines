@@ -4,6 +4,6 @@ import { CONTRACT_VERSION } from "@contextlines/contracts";
 
 describe("extension baseline", () => {
   it("loads the shared contract package", () => {
-    expect(CONTRACT_VERSION).toBe("0.2.0");
+    expect(CONTRACT_VERSION).toBe("0.3.0");
   });
 });

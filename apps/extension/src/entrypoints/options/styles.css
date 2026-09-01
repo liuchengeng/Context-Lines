@@ -85,6 +85,17 @@ button:disabled {
 #status[data-error="true"] {
   color: #ff8d8d;
 }
+.wordbook-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: #8bb8ff;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.wordbook-link:hover {
+  color: #b9d5ff;
+}
 .privacy {
   margin-top: 28px;
   padding-top: 18px;

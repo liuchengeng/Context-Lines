@@ -19,6 +19,85 @@ const context = {
   props: {},
 } as unknown as ExecutionContext;
 
+type VocabularyRow = {
+  id: string;
+  term: string;
+  normalized_term: string;
+  meaning_zh: string;
+  kind: "word" | "phrase";
+  created_at: string;
+  updated_at: string;
+};
+
+function createVocabularyDatabase(): D1Database {
+  const rows = new Map<string, VocabularyRow>();
+  return {
+    prepare(sql: string) {
+      let values: unknown[] = [];
+      const statement = {
+        bind(...nextValues: unknown[]) {
+          values = nextValues;
+          return statement;
+        },
+        async run() {
+          if (sql.startsWith("INSERT INTO vocabulary_items")) {
+            const [
+              id,
+              term,
+              normalizedTerm,
+              meaningZh,
+              kind,
+              createdAt,
+              updatedAt,
+            ] = values as [
+              string,
+              string,
+              string,
+              string,
+              "word" | "phrase",
+              string,
+              string,
+            ];
+            const existing = rows.get(normalizedTerm);
+            rows.set(normalizedTerm, {
+              id: existing?.id ?? id,
+              term,
+              normalized_term: normalizedTerm,
+              meaning_zh: meaningZh,
+              kind,
+              created_at: existing?.created_at ?? createdAt,
+              updated_at: updatedAt,
+            });
+          } else if (sql.startsWith("DELETE FROM vocabulary_items")) {
+            const [id] = values as [string];
+            for (const [key, row] of rows) {
+              if (row.id === id) rows.delete(key);
+            }
+          }
+          return { success: true };
+        },
+        async first() {
+          const [normalizedTerm] = values as [string];
+          const row = rows.get(normalizedTerm);
+          if (!row) return null;
+          const { normalized_term: _normalizedTerm, ...item } = row;
+          return item;
+        },
+        async all() {
+          return {
+            results: Array.from(rows.values())
+              .sort((left, right) =>
+                right.updated_at.localeCompare(left.updated_at),
+              )
+              .map(({ normalized_term: _normalizedTerm, ...item }) => item),
+          };
+        },
+      };
+      return statement;
+    },
+  } as unknown as D1Database;
+}
+
 function request(path: string, init?: RequestInit): Request {
   const headers = new Headers(init?.headers);
   headers.set("Origin", "chrome-extension://abcdefghijklmnop");
@@ -124,5 +203,146 @@ describe("relay worker", () => {
       translation_zh: modelAnswer.translation_zh,
       explanations: modelAnswer.explanations,
     });
+  });
+
+  it("keeps the translation when no phrase needs explanation", async () => {
+    const modelAnswer = {
+      translation_zh: "谢谢。",
+      explanations: [],
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: JSON.stringify(modelAnswer) } }],
+        }),
+        { status: 200 },
+      ),
+    );
+    const response = await worker.fetch(
+      request("/v1/explain", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.RELAY_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ transcript: "Thank you." }),
+      }),
+      env,
+      context,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      transcript: "Thank you.",
+      translation_zh: "谢谢。",
+      explanations: [],
+    });
+  });
+
+  it.each([
+    ["omits explanations", { translation_zh: "谢谢。" }],
+    [
+      "returns malformed explanations",
+      {
+        translation_zh: "谢谢。",
+        explanations: [{ phrase: "", meaning_zh: "" }, "invalid"],
+      },
+    ],
+  ])("keeps valid Chinese when DeepSeek %s", async (_name, modelAnswer) => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: JSON.stringify(modelAnswer) } }],
+        }),
+        { status: 200 },
+      ),
+    );
+    const response = await worker.fetch(
+      request("/v1/explain", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.RELAY_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ transcript: "Thank you." }),
+      }),
+      env,
+      context,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      transcript: "Thank you.",
+      translation_zh: "谢谢。",
+      explanations: [],
+    });
+  });
+
+  it("reports when the personal vocabulary database is not configured", async () => {
+    const response = await worker.fetch(
+      request("/v1/vocabulary", {
+        headers: { Authorization: `Bearer ${env.RELAY_TOKEN}` },
+      }),
+      env,
+      context,
+    );
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({ code: "vocabulary_not_configured" }),
+    );
+  });
+
+  it("saves, deduplicates, lists, and deletes selected vocabulary", async () => {
+    const vocabularyEnv = { ...env, VOCAB_DB: createVocabularyDatabase() };
+    const save = (term: string, meaning_zh: string) =>
+      worker.fetch(
+        request("/v1/vocabulary", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.RELAY_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ term, meaning_zh, kind: "phrase" }),
+        }),
+        vocabularyEnv,
+        context,
+      );
+
+    expect((await save("No end of", "很多")).status).toBe(200);
+    expect((await save("no   end of", "没完没了")).status).toBe(200);
+
+    const list = await worker.fetch(
+      request("/v1/vocabulary", {
+        headers: { Authorization: `Bearer ${env.RELAY_TOKEN}` },
+      }),
+      vocabularyEnv,
+      context,
+    );
+    const listed = (await list.json()) as {
+      items: Array<{ id: string; term: string; meaning_zh: string }>;
+    };
+    expect(listed.items).toHaveLength(1);
+    expect(listed.items[0]).toEqual(
+      expect.objectContaining({
+        term: "no end of",
+        meaning_zh: "没完没了",
+      }),
+    );
+
+    const deleted = await worker.fetch(
+      request(`/v1/vocabulary/${listed.items[0]!.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${env.RELAY_TOKEN}` },
+      }),
+      vocabularyEnv,
+      context,
+    );
+    expect(deleted.status).toBe(200);
+    const emptyList = await worker.fetch(
+      request("/v1/vocabulary", {
+        headers: { Authorization: `Bearer ${env.RELAY_TOKEN}` },
+      }),
+      vocabularyEnv,
+      context,
+    );
+    expect(await emptyList.json()).toEqual({ items: [] });
   });
 });

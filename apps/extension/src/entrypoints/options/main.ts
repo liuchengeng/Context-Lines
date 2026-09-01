@@ -3,6 +3,7 @@ import {
   normalizeRelayBaseUrl,
   saveProviderConfig,
 } from "../../lib/direct-provider";
+import { userFacingErrorMessage } from "../../lib/user-facing-error";
 import "./styles.css";
 
 const form = document.querySelector<HTMLFormElement>("#form")!;
@@ -63,8 +64,10 @@ form.addEventListener("submit", (event) => {
     })
     .catch((error: unknown) => {
       status.dataset.error = "true";
-      status.textContent =
-        error instanceof Error ? error.message : "无法连接 Worker。";
+      status.textContent = userFacingErrorMessage(
+        error,
+        "无法连接 Worker，请稍后重试。",
+      );
     })
     .finally(() => {
       button.disabled = false;
