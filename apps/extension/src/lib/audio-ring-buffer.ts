@@ -67,6 +67,54 @@ export function resampleLinear(
   return output;
 }
 
+export function trimSilence(
+  input: Float32Array,
+  sampleRate: number,
+  maxSeconds = 8,
+): Float32Array {
+  if (input.length === 0 || sampleRate <= 0) return input.slice();
+
+  const frameSize = Math.max(1, Math.round(sampleRate * 0.02));
+  const frameRms: number[] = [];
+  for (let start = 0; start < input.length; start += frameSize) {
+    const end = Math.min(input.length, start + frameSize);
+    let energy = 0;
+    for (let index = start; index < end; index += 1) {
+      const sample = input[index] ?? 0;
+      energy += sample * sample;
+    }
+    frameRms.push(Math.sqrt(energy / Math.max(1, end - start)));
+  }
+
+  const peakRms = Math.max(...frameRms);
+  if (peakRms < 0.001) return input.slice();
+  const activeThreshold = Math.max(0.002, Math.min(0.015, peakRms * 0.12));
+  const firstActiveFrame = frameRms.findIndex(
+    (value) => value >= activeThreshold,
+  );
+  let lastActiveFrame = -1;
+  for (let index = frameRms.length - 1; index >= 0; index -= 1) {
+    if ((frameRms[index] ?? 0) >= activeThreshold) {
+      lastActiveFrame = index;
+      break;
+    }
+  }
+  if (firstActiveFrame < 0 || lastActiveFrame < 0) return input.slice();
+
+  const beforePadding = Math.round(sampleRate * 0.6);
+  const afterPadding = Math.round(sampleRate * 0.35);
+  let start = Math.max(0, firstActiveFrame * frameSize - beforePadding);
+  const end = Math.min(
+    input.length,
+    (lastActiveFrame + 1) * frameSize + afterPadding,
+  );
+  const maxLength = Math.max(1, Math.round(sampleRate * maxSeconds));
+  if (end - start > maxLength) start = end - maxLength;
+  const minimumLength = Math.min(input.length, Math.round(sampleRate * 1.5));
+  if (end - start < minimumLength) start = Math.max(0, end - minimumLength);
+  return input.slice(start, end);
+}
+
 export function encodeMonoWav(
   samples: Float32Array,
   sampleRate: number,

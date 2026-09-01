@@ -1,6 +1,6 @@
 # ContextLines Quick Ask
 
-一个个人使用的 Chrome 116+ 扩展：在内存中保留当前视频最近约 10 秒声音，按 `Alt+Q` 后暂停当前视频，并经个人 Cloudflare Worker 调用豆包流式语音识别小时版与 DeepSeek 中文解释。关闭解释后自动继续播放，不退出全屏，也不保存音频与转写历史。
+一个个人使用的 Chrome 116+ 扩展：在内存中保留当前视频最近约 10 秒声音，按 `Alt+Q` 后暂停当前视频，在本地裁掉首尾静音，再经个人 Cloudflare Worker 调用豆包流式语音识别小时版与 DeepSeek 中文解释。英文转写先显示，中文和短语随后补充；关闭解释后自动继续播放，不退出全屏，也不保存音频与转写历史。
 
 ## 本地开发
 
@@ -49,8 +49,9 @@ corepack pnpm --filter @contextlines/relay exec wrangler deploy
 
 - Chrome 只保存 Worker 地址与随机连接口令。
 - 豆包和 DeepSeek 密钥只存在于 Cloudflare Worker Secrets。
-- 只有用户按 `Alt+Q` 后，最近约 10 秒 WAV 才经 Worker 转发给豆包。
-- 只有豆包转写、最多 160 字页面标题会发送给 DeepSeek。
+- 只有用户按 `Alt+Q` 后，最近音频中裁剪出的最多约 8 秒有效语音才经 Worker 转发给豆包。
+- 只有豆包转写会发送给 DeepSeek，不发送页面标题或网址。
+- 相同音频和转写只在扩展内存中短期缓存；停止监听、关闭标签页或导航后立即清空。
 - Worker 不写数据库，不记录原始音频或完整转写历史。
 
 ## 检查

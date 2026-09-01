@@ -1,19 +1,21 @@
 import type { QuickAskAnswer } from "@contextlines/contracts";
 import {
   answerWithProviders,
+  clearProviderMemoryCache,
   loadProviderConfig,
 } from "../lib/direct-provider";
 
 const LISTENING_KEY = "quickAskListening";
 const OFFSCREEN_PATH = "offscreen.html";
 
-type ListeningState = { tabId: number; title?: string; origin?: string };
+type ListeningState = { tabId: number };
 type ClipResponse =
   | { ok: true; audioBase64: string; durationMs: number }
   | { ok: false; message: string };
 type OverlayView =
   | { status: "toggle" }
   | { status: "loading"; pauseVideo: boolean }
+  | { status: "transcript"; transcript: string }
   | { status: "error"; message: string }
   | { status: "answer"; answer: QuickAskAnswer };
 
@@ -44,6 +46,7 @@ async function ensureOffscreen(): Promise<void> {
 async function stopListening(): Promise<void> {
   const listening = await getListening();
   activeRequestId += 1;
+  clearProviderMemoryCache();
   if (listening) {
     await updateOverlay(
       listening.tabId,
@@ -56,12 +59,12 @@ async function stopListening(): Promise<void> {
     .catch(() => undefined);
   await chrome.storage.session.remove(LISTENING_KEY);
   await chrome.action.setBadgeText({ text: "" });
-  await chrome.action.setTitle({ title: "点击开始监听最近 10 秒" });
+  await chrome.action.setTitle({ title: "点击开始监听最近声音" });
   if (listening) {
     await chrome.action.setBadgeText({ tabId: listening.tabId, text: "" });
     await chrome.action.setTitle({
       tabId: listening.tabId,
-      title: "点击开始监听最近 10 秒",
+      title: "点击开始监听最近声音",
     });
   }
 }
@@ -80,13 +83,8 @@ async function startListening(tab: chrome.tabs.Tab): Promise<void> {
   })) as { ok: boolean; message?: string };
   if (!response.ok)
     throw new Error(response.message || "Chrome 未允许捕获当前标签页");
-  const url = new URL(tab.url);
   await chrome.storage.session.set({
-    [LISTENING_KEY]: {
-      tabId: tab.id,
-      ...(tab.title ? { title: tab.title.slice(0, 160) } : {}),
-      origin: url.origin,
-    } satisfies ListeningState,
+    [LISTENING_KEY]: { tabId: tab.id } satisfies ListeningState,
   });
   await chrome.action.setBadgeBackgroundColor({ color: "#2d8f5b" });
   await chrome.action.setBadgeText({ tabId: tab.id, text: "ON" });
@@ -302,7 +300,16 @@ async function updateOverlay(
         loading.className = "loading";
         const dot = document.createElement("span");
         dot.className = "dot";
-        loading.append(dot, "正在识别刚才约 10 秒，并挑出需要解释的表达…");
+        loading.append(dot, "正在识别最近的有效语音…");
+        card.append(loading);
+      } else if (nextView.status === "transcript") {
+        addText("p", "识别到的完整英文", "label");
+        addText("p", nextView.transcript, "sentence");
+        const loading = document.createElement("div");
+        loading.className = "loading";
+        const dot = document.createElement("span");
+        dot.className = "dot";
+        loading.append(dot, "正在生成整句中文和短语…");
         card.append(loading);
       } else if (nextView.status === "error") {
         addText("p", "处理没有完成", "label");
@@ -360,12 +367,12 @@ async function updateOverlay(
 }
 
 async function callQuickAsk(
-  listening: ListeningState,
   clip: Extract<ClipResponse, { ok: true }>,
+  onTranscript: (transcript: string) => void | Promise<void>,
 ) {
   const config = await loadProviderConfig();
   if (!config) throw new Error("请先点击扩展图标填写 Worker 地址和连接口令。");
-  return answerWithProviders(clip.audioBase64, config, listening.title);
+  return answerWithProviders(clip.audioBase64, config, onTranscript);
 }
 
 async function askAboutRecentAudio(): Promise<void> {
@@ -404,7 +411,15 @@ async function askAboutRecentAudio(): Promise<void> {
       type: "audio:get-clip",
     })) as ClipResponse;
     if (!clip.ok) throw new Error(clip.message);
-    const answer = await callQuickAsk(listening, clip);
+    const answer = await callQuickAsk(clip, async (transcript) => {
+      if (requestId === activeRequestId) {
+        await updateOverlay(
+          tabId,
+          { status: "transcript", transcript },
+          requestId,
+        );
+      }
+    });
     if (requestId === activeRequestId) {
       await updateOverlay(tabId, { status: "answer", answer }, requestId);
     }

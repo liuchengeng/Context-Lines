@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   answerWithProviders,
+  clearProviderMemoryCache,
   extractPcmFromWav,
   extractTranscript,
   makeDoubaoAudioPacket,
@@ -24,7 +25,10 @@ function makeServerPacket(payload: unknown): ArrayBuffer {
   return packet.buffer;
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  clearProviderMemoryCache();
+  vi.unstubAllGlobals();
+});
 
 describe("relay provider", () => {
   it("decodes relay errors and preserves unexpected plain text", () => {
@@ -148,16 +152,20 @@ describe("relay provider", () => {
     const wav = new Uint8Array(
       encodeMonoWav(new Float32Array(320).fill(0.2), 16_000),
     );
+    const onTranscript = vi.fn();
+    const providerConfig = {
+      relayUrl: "https://demo.workers.dev",
+      relayToken: "abcdefghijklmnopqrstuvwxyz123456",
+    };
+    const audioBase64 = Buffer.from(wav).toString("base64");
     const result = await answerWithProviders(
-      Buffer.from(wav).toString("base64"),
-      {
-        relayUrl: "https://demo.workers.dev",
-        relayToken: "abcdefghijklmnopqrstuvwxyz123456",
-      },
-      "Video",
+      audioBase64,
+      providerConfig,
+      onTranscript,
     );
 
     expect(result.explanations[0]?.phrase).toBe("Not a chance");
+    expect(onTranscript).toHaveBeenCalledWith("Not a chance.");
     expect(opened).toEqual([
       {
         url: "wss://demo.workers.dev/v1/doubao",
@@ -172,9 +180,12 @@ describe("relay provider", () => {
         }),
         body: JSON.stringify({
           transcript: "Not a chance.",
-          page_title: "Video",
         }),
       }),
     );
+
+    await answerWithProviders(audioBase64, providerConfig);
+    expect(opened).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

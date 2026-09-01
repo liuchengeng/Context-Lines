@@ -3,6 +3,7 @@ import {
   arrayBufferToBase64,
   encodeMonoWav,
   resampleLinear,
+  trimSilence,
 } from "../../lib/audio-ring-buffer";
 
 type StartMessage = { type: "audio:start"; streamId: string; tabId: number };
@@ -101,7 +102,8 @@ chrome.runtime.onMessage.addListener(
         sendResponse({ ok: false, message: "声音还太短，请播放片刻后再问" });
         return;
       }
-      const samples = resampleLinear(source, context.sampleRate, 16_000);
+      const activeAudio = trimSilence(source, context.sampleRate);
+      const samples = resampleLinear(activeAudio, context.sampleRate, 16_000);
       sendResponse({
         ok: true,
         audioBase64: arrayBufferToBase64(encodeMonoWav(samples, 16_000)),

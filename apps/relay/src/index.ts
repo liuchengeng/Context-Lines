@@ -18,7 +18,6 @@ export interface Env {
 
 const ExplainInputSchema = z.object({
   transcript: z.string().trim().min(1).max(500),
-  page_title: z.string().trim().max(160).default(""),
 });
 
 const DeepSeekResponseSchema = z.object({
@@ -325,19 +324,16 @@ async function handleExplain(request: Request, env: Env): Promise<Response> {
         model: "deepseek-v4-flash",
         thinking: { type: "disabled" },
         response_format: { type: "json_object" },
-        max_tokens: 350,
+        max_tokens: 220,
         messages: [
           {
             role: "system",
             content:
-              '你是英语影视字幕翻译与短语挑选器。translation_zh 要自然、完整地翻译输入的全部英文，只给译文，不加说明。从输入英文中选出 1 到 3 个最值得中国学习者注意的俚语、习语、短语动词或不能直译的表达；没有多个就只选一个，不要用普通单词或直白短语凑数。phrase 必须逐字来自输入英文，是不重叠的连续片段。meaning_zh 只写该处最直接自然的中文含义，最多 18 个汉字；不要写“这里表示”“意思是”“通常用于”等开场，不提供用法、语境、例句或重复解释。不要补造剧情。输出严格 JSON：{"translation_zh":"完整中文译文","explanations":[{"phrase":"英文片段","meaning_zh":"简短中文"}]}。',
+              '翻译英文影视字幕并返回 JSON：{"translation_zh":"完整自然中文，不加说明","explanations":[{"phrase":"原文连续片段","meaning_zh":"最多18字中文"}]}。explanations 选 1 至 3 个真正需解释的俚语、习语、短语动词或不可直译表达；不够勿凑，片段不得重叠。勿添加语境、用法、例句或剧情。',
           },
           {
             role: "user",
-            content: JSON.stringify({
-              transcript: input.transcript,
-              page_title: input.page_title,
-            }),
+            content: input.transcript,
           },
         ],
       }),

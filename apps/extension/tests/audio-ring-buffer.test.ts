@@ -3,6 +3,7 @@ import {
   AudioRingBuffer,
   encodeMonoWav,
   resampleLinear,
+  trimSilence,
 } from "../src/lib/audio-ring-buffer";
 
 describe("AudioRingBuffer", () => {
@@ -18,5 +19,16 @@ describe("AudioRingBuffer", () => {
     const wav = encodeMonoWav(downsampled, 16_000);
     expect(new TextDecoder().decode(wav.slice(0, 4))).toBe("RIFF");
     expect(wav.byteLength).toBe(48);
+  });
+  it("removes distant silence and caps continuously active audio", () => {
+    const sampleRate = 100;
+    const padded = new Float32Array(1_000);
+    padded.fill(0.2, 200, 600);
+    const trimmed = trimSilence(padded, sampleRate);
+    expect(trimmed.length).toBeGreaterThanOrEqual(400);
+    expect(trimmed.length).toBeLessThan(600);
+
+    const continuous = new Float32Array(1_000).fill(0.2);
+    expect(trimSilence(continuous, sampleRate)).toHaveLength(800);
   });
 });

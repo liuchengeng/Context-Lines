@@ -7,11 +7,70 @@ const CONFIG_KEY = "providerConfig";
 const AUDIO_CHUNK_BYTES = 6_400;
 const RELAY_PROTOCOL = "contextlines";
 const RELAY_ERROR_PREFIX = "contextlines-error:";
+const CACHE_TTL_MS = 2 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 12;
+
+type CacheEntry<T> = { value: T; expiresAt: number };
+
+const transcriptCache = new Map<string, CacheEntry<string>>();
+const answerCache = new Map<string, CacheEntry<QuickAskAnswer>>();
 
 export type ProviderConfig = {
   relayUrl: string;
   relayToken: string;
 };
+
+function readCache<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+): T | undefined {
+  const entry = cache.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return undefined;
+  }
+  cache.delete(key);
+  cache.set(key, entry);
+  return entry.value;
+}
+
+function writeCache<T>(
+  cache: Map<string, CacheEntry<T>>,
+  key: string,
+  value: T,
+): void {
+  cache.delete(key);
+  cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+  while (cache.size > MAX_CACHE_ENTRIES) {
+    const oldestKey = cache.keys().next().value;
+    if (typeof oldestKey !== "string") break;
+    cache.delete(oldestKey);
+  }
+}
+
+async function audioFingerprint(audioBase64: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(audioBase64),
+  );
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+function transcriptCacheKey(config: ProviderConfig, audioHash: string): string {
+  return `${config.relayUrl}\n${audioHash}`;
+}
+
+function answerCacheKey(config: ProviderConfig, transcript: string): string {
+  return `${config.relayUrl}\n${transcript.toLocaleLowerCase().replace(/\s+/g, " ").trim()}`;
+}
+
+export function clearProviderMemoryCache(): void {
+  transcriptCache.clear();
+  answerCache.clear();
+}
 
 export function normalizeRelayBaseUrl(value: string): string {
   let url: URL;
@@ -439,9 +498,19 @@ async function transcribe(
   audioBase64: string,
   config: ProviderConfig,
 ): Promise<string> {
-  const task = transcriptionTail.then(() =>
-    transcribeOnce(audioBase64, config),
+  const cacheKey = transcriptCacheKey(
+    config,
+    await audioFingerprint(audioBase64),
   );
+  const cached = readCache(transcriptCache, cacheKey);
+  if (cached) return cached;
+  const task = transcriptionTail.then(async () => {
+    const queuedCacheHit = readCache(transcriptCache, cacheKey);
+    if (queuedCacheHit) return queuedCacheHit;
+    const transcript = await transcribeOnce(audioBase64, config);
+    writeCache(transcriptCache, cacheKey, transcript);
+    return transcript;
+  });
   transcriptionTail = task.catch(() => undefined);
   return task;
 }
@@ -449,16 +518,20 @@ async function transcribe(
 export async function answerWithProviders(
   audioBase64: string,
   config: ProviderConfig,
-  pageTitle?: string,
+  onTranscript?: (transcript: string) => void | Promise<void>,
 ): Promise<QuickAskAnswer> {
   const transcript = await transcribe(audioBase64, config);
+  await onTranscript?.(transcript);
+  const cacheKey = answerCacheKey(config, transcript);
+  const cached = readCache(answerCache, cacheKey);
+  if (cached) return cached;
   const response = await fetch(relayHttpUrl(config.relayUrl, "/v1/explain"), {
     method: "POST",
     headers: {
       Authorization: `Bearer ${config.relayToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ transcript, page_title: pageTitle ?? "" }),
+    body: JSON.stringify({ transcript }),
   });
   const decoded = (await response.json().catch(() => null)) as unknown;
   if (!response.ok) {
@@ -473,5 +546,6 @@ export async function answerWithProviders(
   }
   const parsed = QuickAskAnswerSchema.safeParse(decoded);
   if (!parsed.success) throw new Error("中转服务返回的解释格式无效。");
+  writeCache(answerCache, cacheKey, parsed.data);
   return parsed.data;
 }

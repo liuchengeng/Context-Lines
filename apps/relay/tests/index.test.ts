@@ -87,14 +87,23 @@ describe("relay worker", () => {
       translation_zh: "想都别想。",
       explanations: [{ phrase: "Not a chance", meaning_zh: "想都别想" }],
     };
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      const body = JSON.parse(String(init?.body)) as {
+        max_tokens: number;
+        messages: Array<{ role: string; content: string }>;
+      };
+      expect(body.max_tokens).toBe(220);
+      expect(body.messages.at(-1)).toEqual({
+        role: "user",
+        content: "Not a chance.",
+      });
+      return new Response(
         JSON.stringify({
           choices: [{ message: { content: JSON.stringify(modelAnswer) } }],
         }),
         { status: 200 },
-      ),
-    );
+      );
+    });
     const response = await worker.fetch(
       request("/v1/explain", {
         method: "POST",
@@ -104,7 +113,6 @@ describe("relay worker", () => {
         },
         body: JSON.stringify({
           transcript: "Not a chance.",
-          page_title: "Video",
         }),
       }),
       env,

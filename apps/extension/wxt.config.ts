@@ -18,7 +18,7 @@ export default defineConfig({
       "http://localhost/*",
       "http://127.0.0.1/*",
     ],
-    action: { default_title: "点击开始监听最近 10 秒" },
+    action: { default_title: "点击开始监听最近声音" },
     commands: {
       "quick-ask": {
         suggested_key: { default: "Alt+Q" },
